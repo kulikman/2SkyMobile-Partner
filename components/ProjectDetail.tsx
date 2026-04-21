@@ -19,6 +19,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import EditIcon from '@mui/icons-material/Edit';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { RoadmapView } from './RoadmapView';
 import { ReportList } from './ReportList';
 import { ProjectChat } from './ProjectChat';
@@ -35,6 +36,7 @@ export type ProjectData = {
   client_name: string | null;
   started_at: string | null;
   deadline_at: string | null;
+  stage_url: string | null;
 };
 
 type CurrentUser = {
@@ -80,6 +82,7 @@ export function ProjectDetail({
   const [editProgress, setEditProgress] = useState(0);
   const [editStartedAt, setEditStartedAt] = useState('');
   const [editDeadlineAt, setEditDeadlineAt] = useState('');
+  const [editStageUrl, setEditStageUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -90,6 +93,7 @@ export function ProjectDetail({
     setEditProgress(project.progress);
     setEditStartedAt(project.started_at?.slice(0, 10) ?? '');
     setEditDeadlineAt(project.deadline_at?.slice(0, 10) ?? '');
+    setEditStageUrl(project.stage_url ?? '');
     setEditError('');
     setEditOpen(true);
   }
@@ -108,6 +112,7 @@ export function ProjectDetail({
         progress: editProgress,
         started_at: editStartedAt || null,
         deadline_at: editDeadlineAt || null,
+        stage_url: editStageUrl.trim() || null,
       }),
     });
     const data = await res.json();
@@ -121,6 +126,7 @@ export function ProjectDetail({
       progress: data.progress ?? prev.progress,
       started_at: data.started_at ?? null,
       deadline_at: data.deadline_at ?? null,
+      stage_url: data.stage_url ?? null,
     }));
     setEditOpen(false);
     router.refresh();
@@ -185,6 +191,22 @@ export function ProjectDetail({
               </Typography>
             )}
           </Stack>
+        )}
+
+        {project.stage_url && (
+          <Box>
+            <Button
+              variant="outlined"
+              size="small"
+              href={project.stage_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              endIcon={<OpenInNewIcon fontSize="small" />}
+              sx={{ textTransform: 'none' }}
+            >
+              Open Stage Environment
+            </Button>
+          </Box>
         )}
       </Stack>
 
@@ -262,6 +284,14 @@ export function ProjectDetail({
                 fullWidth
               />
             </Stack>
+            <TextField
+              label="Stage URL"
+              placeholder="https://staging.example.com"
+              value={editStageUrl}
+              onChange={(e) => setEditStageUrl(e.target.value)}
+              fullWidth
+              helperText="Link to the staging / test environment"
+            />
             {editError && (
               <Typography variant="caption" color="error">{editError}</Typography>
             )}

@@ -2,7 +2,6 @@
 
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Link from 'next/link';
@@ -50,23 +49,16 @@ export function Navbar({ isAdmin, userId }: { isAdmin: boolean; userId?: string 
         >
           <Stack direction="row" spacing={1.25} alignItems="center">
             <Box
-              component="img"
-              src="/td-logo.svg"
-              alt="TD logo"
-              sx={{ width: 42, height: 42, borderRadius: 1.5 }}
-            />
-            <Box>
-              <Typography
-                variant="subtitle1"
-                component={Link}
-                href="/"
-                sx={{ textDecoration: 'none', color: 'text.primary', fontWeight: 800 }}
-              >
-                Threadoc
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                Project portal
-              </Typography>
+              component={Link}
+              href="/"
+              sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}
+            >
+              <Box
+                component="img"
+                src="/logo.svg"
+                alt="2SkyMobile"
+                sx={{ height: 24 }}
+              />
             </Box>
           </Stack>
 

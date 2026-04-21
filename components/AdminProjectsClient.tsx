@@ -98,6 +98,7 @@ export function AdminProjectsClient({
   const [editStartedAt, setEditStartedAt] = useState('');
   const [editDeadlineAt, setEditDeadlineAt] = useState('');
   const [editCompanyId, setEditCompanyId] = useState<string>('');
+  const [editStageUrl, setEditStageUrl] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Member dialog
@@ -113,6 +114,7 @@ export function AdminProjectsClient({
     setEditStartedAt(p.started_at?.split('T')[0] ?? '');
     setEditDeadlineAt(p.deadline_at?.split('T')[0] ?? '');
     setEditCompanyId(p.company_id ?? '');
+    setEditStageUrl((p as Record<string, unknown>).stage_url as string ?? '');
   }
 
   async function createProject() {
@@ -141,6 +143,7 @@ export function AdminProjectsClient({
         started_at: data.started_at ?? null,
         deadline_at: data.deadline_at ?? null,
         position: data.position ?? 0,
+        company_id: data.company_id ?? null,
       }]);
       setCreateOpen(false);
       setNewName('');
@@ -164,6 +167,7 @@ export function AdminProjectsClient({
         started_at: editStartedAt || null,
         deadline_at: editDeadlineAt || null,
         company_id: editCompanyId || null,
+        stage_url: editStageUrl.trim() || null,
       }),
     });
     if (res.ok) {
@@ -419,6 +423,13 @@ export function AdminProjectsClient({
                 fullWidth
               />
             </Stack>
+            <TextField
+              label="Stage URL"
+              placeholder="https://staging.example.com"
+              value={editStageUrl}
+              onChange={(e) => setEditStageUrl(e.target.value)}
+              fullWidth
+            />
             <TextField
               label="Company"
               select

@@ -49,11 +49,14 @@ export default function LoginPage() {
           boxShadow: '0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04)',
         }}
       >
-        <Typography variant="h5" fontWeight={700} sx={{ fontSize: '1.25rem', mb: 0.5 }}>
-          Sign in
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+          <Box component="img" src="/logo.svg" alt="2SkyMobile" sx={{ height: 32 }} />
+        </Box>
+        <Typography variant="h5" fontWeight={700} sx={{ fontSize: '1.25rem', mb: 0.5, textAlign: 'center' }}>
+          Partner Portal
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-          Enter your credentials to continue.
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, textAlign: 'center' }}>
+          Sign in to access your projects
         </Typography>
         <form onSubmit={handleSubmit}>
           <Stack spacing={2}>
