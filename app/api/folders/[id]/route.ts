@@ -30,6 +30,8 @@ export async function PATCH(
   if (body.client_name !== undefined) updates.client_name = body.client_name;
   if (body.started_at !== undefined) updates.started_at  = body.started_at;
   if (body.deadline_at !== undefined) updates.deadline_at = body.deadline_at;
+  if (body.company_id !== undefined)  updates.company_id  = body.company_id;
+  if (body.tech_spec !== undefined)   updates.tech_spec   = body.tech_spec;
 
   const { data, error } = await supabase
     .from('folders')

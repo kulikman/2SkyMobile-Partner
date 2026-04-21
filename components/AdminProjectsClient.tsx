@@ -34,6 +34,12 @@ type Project = {
   started_at: string | null;
   deadline_at: string | null;
   position: number;
+  company_id: string | null;
+};
+
+type Company = {
+  id: string;
+  name: string;
 };
 
 type UserInfo = {
@@ -66,10 +72,12 @@ export function AdminProjectsClient({
   initialProjects,
   allUsers,
   initialMemberships,
+  companies,
 }: {
   initialProjects: Project[];
   allUsers: UserInfo[];
   initialMemberships: Membership[];
+  companies: Company[];
 }) {
   const [projects, setProjects] = useState(initialProjects);
   const [memberships, setMemberships] = useState(initialMemberships);
@@ -89,6 +97,7 @@ export function AdminProjectsClient({
   const [editProgress, setEditProgress] = useState(0);
   const [editStartedAt, setEditStartedAt] = useState('');
   const [editDeadlineAt, setEditDeadlineAt] = useState('');
+  const [editCompanyId, setEditCompanyId] = useState<string>('');
   const [saving, setSaving] = useState(false);
 
   // Member dialog
@@ -103,6 +112,7 @@ export function AdminProjectsClient({
     setEditProgress(p.progress);
     setEditStartedAt(p.started_at?.split('T')[0] ?? '');
     setEditDeadlineAt(p.deadline_at?.split('T')[0] ?? '');
+    setEditCompanyId(p.company_id ?? '');
   }
 
   async function createProject() {
@@ -153,6 +163,7 @@ export function AdminProjectsClient({
         progress: editProgress,
         started_at: editStartedAt || null,
         deadline_at: editDeadlineAt || null,
+        company_id: editCompanyId || null,
       }),
     });
     if (res.ok) {
@@ -168,6 +179,7 @@ export function AdminProjectsClient({
                 progress: data.progress ?? p.progress,
                 started_at: data.started_at ?? null,
                 deadline_at: data.deadline_at ?? null,
+                company_id: data.company_id ?? null,
               }
             : p,
         ),
@@ -260,11 +272,18 @@ export function AdminProjectsClient({
                     <Chip label={`${p.progress}%`} size="small" variant="outlined" />
                   )}
                 </Stack>
-                {p.client_name && (
-                  <Typography variant="caption" color="text.secondary">
-                    Client: {p.client_name}
-                  </Typography>
-                )}
+                <Stack direction="row" spacing={1.5} mt={0.5} flexWrap="wrap" useFlexGap>
+                  {p.client_name && (
+                    <Typography variant="caption" color="text.secondary">
+                      Client: {p.client_name}
+                    </Typography>
+                  )}
+                  {p.company_id && (
+                    <Typography variant="caption" color="primary.main">
+                      {companies.find((c) => c.id === p.company_id)?.name ?? ''}
+                    </Typography>
+                  )}
+                </Stack>
               </Box>
               <Stack direction="row" spacing={0.5}>
                 <IconButton size="small" onClick={() => setMemberProject(p)} title="Members">
@@ -400,12 +419,24 @@ export function AdminProjectsClient({
                 fullWidth
               />
             </Stack>
+            <TextField
+              label="Company"
+              select
+              value={editCompanyId}
+              onChange={(e) => setEditCompanyId(e.target.value)}
+              fullWidth
+            >
+              <MenuItem value="">— No company —</MenuItem>
+              {companies.map((c) => (
+                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+              ))}
+            </TextField>
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditProject(null)}>Cancel</Button>
           <Button variant="contained" disabled={saving || !editName.trim()} onClick={saveEdit}>
-            Save
+            {saving ? 'Saving…' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>

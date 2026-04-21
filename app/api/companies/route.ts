@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
-  const { name, email, password } = body;
+  const { name, email, password, logo_url } = body;
   if (!name?.trim()) return NextResponse.json({ error: 'name is required' }, { status: 400 });
   if (!email?.trim()) return NextResponse.json({ error: 'email is required' }, { status: 400 });
   if (!password?.trim()) return NextResponse.json({ error: 'password is required' }, { status: 400 });
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   // Create company record
   const { data: company, error: companyError } = await adminClient
     .from('companies')
-    .insert({ name: name.trim() })
+    .insert({ name: name.trim(), logo_url: logo_url ?? null })
     .select()
     .single();
 

@@ -31,6 +31,11 @@ export default async function AdminProjectsPage() {
     .from('project_members')
     .select('*');
 
+  const { data: companies } = await adminClient
+    .from('companies')
+    .select('id, name')
+    .order('name', { ascending: true });
+
   const projects = (folders ?? []).map((f) => ({
     id: f.id,
     name: f.name,
@@ -42,6 +47,7 @@ export default async function AdminProjectsPage() {
     started_at: f.started_at ?? null,
     deadline_at: f.deadline_at ?? null,
     position: f.position ?? 0,
+    company_id: (f as Record<string, unknown>).company_id as string | null ?? null,
   }));
 
   const allUsers = users.map((u) => ({
@@ -64,6 +70,7 @@ export default async function AdminProjectsPage() {
           initialProjects={projects}
           allUsers={allUsers}
           initialMemberships={membershipData}
+          companies={companies ?? []}
         />
       </Container>
     </Box>

@@ -41,9 +41,11 @@ export function AdminCompaniesClient({ initialCompanies }: { initialCompanies: C
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newLogoUrl, setNewLogoUrl] = useState('');
 
   // Edit form state
   const [editName, setEditName] = useState('');
+  const [editLogoUrl, setEditLogoUrl] = useState('');
 
   async function handleCreate() {
     if (!newName.trim() || !newEmail.trim() || !newPassword.trim()) {
@@ -55,14 +57,14 @@ export function AdminCompaniesClient({ initialCompanies }: { initialCompanies: C
     const res = await fetch('/api/companies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName.trim(), email: newEmail.trim(), password: newPassword }),
+      body: JSON.stringify({ name: newName.trim(), email: newEmail.trim(), password: newPassword, logo_url: newLogoUrl.trim() || null }),
     });
     const data = await res.json();
     setSaving(false);
     if (!res.ok) { setError(data.error ?? 'Error'); return; }
     setCompanies((prev) => [{ ...data.company, user_email: newEmail.trim() }, ...prev]);
     setCreateOpen(false);
-    setNewName(''); setNewEmail(''); setNewPassword('');
+    setNewName(''); setNewEmail(''); setNewPassword(''); setNewLogoUrl('');
     router.refresh();
   }
 
@@ -73,12 +75,12 @@ export function AdminCompaniesClient({ initialCompanies }: { initialCompanies: C
     const res = await fetch(`/api/companies/${editTarget.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: editName.trim() }),
+      body: JSON.stringify({ name: editName.trim(), logo_url: editLogoUrl.trim() || null }),
     });
     const data = await res.json();
     setSaving(false);
     if (!res.ok) { setError(data.error ?? 'Error'); return; }
-    setCompanies((prev) => prev.map((c) => c.id === editTarget.id ? { ...c, name: data.name } : c));
+    setCompanies((prev) => prev.map((c) => c.id === editTarget.id ? { ...c, name: data.name, logo_url: data.logo_url } : c));
     setEditTarget(null);
   }
 
@@ -121,14 +123,24 @@ export function AdminCompaniesClient({ initialCompanies }: { initialCompanies: C
                 <Stack direction="row" spacing={2} alignItems="center">
                   <Box
                     sx={{
-                      width: 40, height: 40, borderRadius: 2,
+                      width: 44, height: 44, borderRadius: 2, overflow: 'hidden',
                       bgcolor: 'primary.main', display: 'flex',
                       alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0, border: '1px solid', borderColor: 'divider',
                     }}
                   >
-                    <Typography variant="subtitle2" color="white" fontWeight={700}>
-                      {company.name.slice(0, 2).toUpperCase()}
-                    </Typography>
+                    {company.logo_url ? (
+                      <Box
+                        component="img"
+                        src={company.logo_url}
+                        alt={company.name}
+                        sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <Typography variant="subtitle2" color="white" fontWeight={700}>
+                        {company.name.slice(0, 2).toUpperCase()}
+                      </Typography>
+                    )}
                   </Box>
                   <Box>
                     <Typography variant="body1" fontWeight={600}>{company.name}</Typography>
@@ -166,6 +178,23 @@ export function AdminCompaniesClient({ initialCompanies }: { initialCompanies: C
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField label="Company name" value={newName} onChange={(e) => setNewName(e.target.value)} fullWidth autoFocus />
+            <TextField
+              label="Logo URL (optional)"
+              placeholder="https://example.com/logo.png"
+              value={newLogoUrl}
+              onChange={(e) => setNewLogoUrl(e.target.value)}
+              fullWidth
+              helperText="Public image URL — leave blank to use initials"
+            />
+            {newLogoUrl && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box component="img" src={newLogoUrl} alt="preview"
+                  sx={{ width: 40, height: 40, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider' }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                <Typography variant="caption" color="text.secondary">Preview</Typography>
+              </Box>
+            )}
             <TextField label="Partner email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} fullWidth />
             <TextField label="Password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} fullWidth />
             {error && <Typography variant="caption" color="error">{error}</Typography>}
@@ -180,11 +209,34 @@ export function AdminCompaniesClient({ initialCompanies }: { initialCompanies: C
       </Dialog>
 
       {/* Edit dialog */}
-      <Dialog open={!!editTarget} onClose={() => setEditTarget(null)} maxWidth="xs" fullWidth>
+      <Dialog
+        open={!!editTarget}
+        onClose={() => setEditTarget(null)}
+        maxWidth="xs"
+        fullWidth
+        TransitionProps={{ onEnter: () => { setEditLogoUrl(editTarget?.logo_url ?? ''); } }}
+      >
         <DialogTitle fontWeight={700}>Edit company</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField label="Company name" value={editName} onChange={(e) => setEditName(e.target.value)} fullWidth autoFocus />
+            <TextField
+              label="Logo URL"
+              placeholder="https://example.com/logo.png"
+              value={editLogoUrl}
+              onChange={(e) => setEditLogoUrl(e.target.value)}
+              fullWidth
+              helperText="Leave blank to use initials"
+            />
+            {editLogoUrl && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box component="img" src={editLogoUrl} alt="preview"
+                  sx={{ width: 40, height: 40, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider' }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                <Typography variant="caption" color="text.secondary">Preview</Typography>
+              </Box>
+            )}
             {error && <Typography variant="caption" color="error">{error}</Typography>}
           </Stack>
         </DialogContent>

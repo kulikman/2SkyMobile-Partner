@@ -86,9 +86,9 @@ const TYPE_COLORS: Record<string, string> = {
   Testing:        '#c62828',
 };
 
-function StatusChip({ status, onChange, isAdmin }: { status: string; onChange?: (s: string) => void; isAdmin: boolean }) {
+function StatusChip({ status, onChange }: { status: string; onChange?: (s: string) => void; isAdmin: boolean }) {
   const s = STATUSES.find((x) => x.value === status) ?? STATUSES[0];
-  if (!onChange || isAdmin) {
+  if (!onChange) {
     return (
       <Chip label={s.label} size="small"
         sx={{ bgcolor: s.color + '22', color: s.color, fontWeight: 600, fontSize: 11, border: `1px solid ${s.color}44` }} />
@@ -159,7 +159,7 @@ function TaskRow({ task, isAdmin, onStatusChange, onOpenComments }:
           <StatusChip
             status={task.status}
             isAdmin={isAdmin}
-            onChange={!isAdmin ? handleStatus : undefined}
+            onChange={isAdmin ? handleStatus : undefined}
           />
         )}
       </TableCell>
