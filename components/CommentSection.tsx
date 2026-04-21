@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -21,7 +21,7 @@ export function CommentSection({ documentId, userId }: { documentId: string; use
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     // Initial load
@@ -48,7 +48,7 @@ export function CommentSection({ documentId, userId }: { documentId: string; use
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [documentId]);
+  }, [documentId, supabase]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

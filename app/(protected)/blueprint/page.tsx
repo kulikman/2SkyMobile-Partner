@@ -1,7 +1,5 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
 import Divider from '@mui/material/Divider';
@@ -229,9 +227,9 @@ function DesktopMockup() {
             variant="outlined"
             sx={{
               p: { xs: 2, md: 3 },
-              borderRadius: 4,
-              background:
-                'linear-gradient(180deg, rgba(255,252,247,1) 0%, rgba(252,249,243,1) 100%)',
+              borderRadius: '14px',
+              bgcolor: 'background.paper',
+              boxShadow: '0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04)',
             }}
           >
             <Stack spacing={2}>
@@ -245,8 +243,8 @@ function DesktopMockup() {
               <Box
                 sx={{
                   p: 1.5,
-                  borderRadius: 3,
-                  backgroundColor: 'rgba(194, 159, 84, 0.16)',
+                  borderRadius: '10px',
+                  bgcolor: '#E0F2FE',
                   borderLeft: '4px solid',
                   borderColor: 'primary.main',
                 }}
@@ -267,8 +265,8 @@ function DesktopMockup() {
             variant="outlined"
             sx={{
               p: 2,
-              borderRadius: 4,
-              bgcolor: 'rgba(250, 247, 241, 0.9)',
+              borderRadius: '14px',
+              bgcolor: '#FCFCFD',
             }}
           >
             <Stack spacing={1.5}>
@@ -327,8 +325,7 @@ function MobileMockup() {
               width: 296,
               borderRadius: '32px',
               p: 1.2,
-              background:
-                'linear-gradient(180deg, rgba(251,248,242,1) 0%, rgba(244,238,229,1) 100%)',
+              bgcolor: '#FCFCFD',
             }}
           >
             <Paper
@@ -375,9 +372,10 @@ function MobileMockup() {
                   sx={{
                     mt: 1,
                     p: 1.5,
-                    borderRadius: 3,
-                    bgcolor: 'rgba(194, 159, 84, 0.14)',
-                    border: '1px dashed rgba(194, 159, 84, 0.5)',
+                    borderRadius: '10px',
+                    bgcolor: '#F5FBFF',
+                    border: '1px dashed',
+                    borderColor: 'primary.main',
                   }}
                 >
                   <Typography variant="body2">
@@ -423,14 +421,8 @@ export default async function BlueprintPage() {
   const isAdmin = user?.user_metadata?.role === 'admin';
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        background:
-          'radial-gradient(circle at top, rgba(230,219,199,0.45) 0%, rgba(245,241,233,0.92) 28%, #f6f3ed 100%)',
-      }}
-    >
-      <Navbar isAdmin={Boolean(isAdmin)} />
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      <Navbar isAdmin={Boolean(isAdmin)} userId={user?.id} />
 
       <Container maxWidth="xl" sx={{ py: { xs: 4, md: 6 } }}>
         <Stack spacing={6}>

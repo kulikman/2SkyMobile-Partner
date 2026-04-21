@@ -91,7 +91,7 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
-      <Navbar isAdmin={isAdmin} />
+      <Navbar isAdmin={isAdmin} userId={user?.id} />
       <Container maxWidth="xl" sx={{ py: 5 }}>
         <Box
           sx={{

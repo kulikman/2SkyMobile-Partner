@@ -10,7 +10,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { items }: { items: ReorderItem[] } = await request.json();
+  let body: { items?: ReorderItem[] };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+  const { items } = body;
+  if (!Array.isArray(items)) {
+    return NextResponse.json({ error: 'items must be an array' }, { status: 400 });
+  }
 
   await Promise.all(
     items.map(({ id, folder_id, position }) =>

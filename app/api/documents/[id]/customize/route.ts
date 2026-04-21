@@ -12,7 +12,14 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { card_color, card_icon } = await request.json();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+  const { card_color, card_icon } = body;
   const { data, error } = await supabase
     .from('documents')
     .update({ card_color: card_color ?? null, card_icon: card_icon ?? null })

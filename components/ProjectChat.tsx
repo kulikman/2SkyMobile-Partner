@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
@@ -43,17 +43,21 @@ export function ProjectChat({
   const [loading, setLoading] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     if (!open) return;
 
-    // Load existing messages
-    fetch(`/api/chat?folderId=${folderId}`)
+    const controller = new AbortController();
+
+    fetch(`/api/chat?folderId=${folderId}`, { signal: controller.signal })
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setMessages(data);
         setInitialLoaded(true);
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') setInitialLoaded(true);
       });
 
     // Realtime subscription
@@ -78,9 +82,10 @@ export function ProjectChat({
       .subscribe();
 
     return () => {
+      controller.abort();
       supabase.removeChannel(channel);
     };
-  }, [open, folderId]);
+  }, [open, folderId, supabase]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });

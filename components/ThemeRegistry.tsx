@@ -1,12 +1,13 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { ThemeProvider, createTheme, type Theme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter';
 import type { StorageManager } from '@mui/system/cssVars';
 import type { ThemeMode } from '@/lib/theme-mode';
 import { THEME_MODE_COOKIE } from '@/lib/theme-mode';
+import { CRM } from '@/lib/crm-design-tokens';
 
 const THEME_CHANGE_EVENT = 'threadoc-theme-mode-change';
 
@@ -47,6 +48,9 @@ const cookieStorageManager: StorageManager = ({ key }) => ({
   },
 });
 
+const figtreeStack =
+  'var(--font-figtree), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
 export function ThemeRegistry({
   children,
   initialMode,
@@ -64,53 +68,128 @@ export function ThemeRegistry({
         colorSchemes: {
           light: {
             palette: {
-              primary: { main: '#0c7bdc' },
-              secondary: { main: '#062e65' },
-              background: { default: '#eef4fb', paper: '#ffffff' },
-              text: { primary: '#122033', secondary: '#5f7188' },
+              primary: {
+                main: CRM.brand.DEFAULT,
+                light: CRM.brand.light,
+                dark: CRM.brand.hover,
+                contrastText: '#ffffff',
+              },
+              secondary: { main: CRM.ink[700], contrastText: '#ffffff' },
+              divider: CRM.ink[200],
+              background: { default: CRM.ink[50], paper: '#ffffff' },
+              text: { primary: CRM.ink[900], secondary: CRM.ink[400] },
+              error: { main: CRM.semantic.danger },
+              success: { main: CRM.semantic.successText },
+              warning: { main: CRM.semantic.warning },
+              action: { hover: CRM.ink[50], selected: CRM.brand.tint },
             },
           },
           dark: {
             palette: {
-              primary: { main: '#68b4ff' },
-              secondary: { main: '#9dc7ff' },
-              background: { default: '#0b1420', paper: '#111c2b' },
-              text: { primary: '#eef4ff', secondary: '#a7b6cc' },
+              primary: {
+                main: '#5CB3FF',
+                light: '#B8E0FF',
+                dark: '#3A9AE8',
+                contrastText: '#ffffff',
+              },
+              secondary: { main: '#C7CCD1', contrastText: '#0e1114' },
+              divider: 'rgba(199, 204, 209, 0.28)',
+              background: { default: '#0e1114', paper: '#181c20' },
+              text: { primary: '#f5f6f7', secondary: '#9ca3af' },
+              error: { main: '#f0a8a6' },
+              success: { main: '#86efac' },
+              warning: { main: '#fbbf24' },
+              action: { hover: 'rgba(255,255,255,0.06)', selected: 'rgba(0,124,219,0.18)' },
             },
           },
         },
-        shape: { borderRadius: 10 },
+        shape: { borderRadius: CRM.radius.md },
         typography: {
-          fontFamily: '"Segoe UI", "Trebuchet MS", sans-serif',
-          h3: { fontWeight: 800, letterSpacing: '-0.03em' },
-          h4: { fontWeight: 800, letterSpacing: '-0.03em' },
-          h5: { fontWeight: 750 },
-          button: { textTransform: 'none', fontWeight: 700 },
+          fontFamily: figtreeStack,
+          htmlFontSize: 16,
+          body1: { fontSize: '0.8125rem', lineHeight: 1.5 },
+          body2: { fontSize: '0.75rem', lineHeight: 1.4 },
+          h3: { fontWeight: 800, letterSpacing: '-0.02em' },
+          h4: { fontWeight: 800, letterSpacing: '-0.02em' },
+          h5: { fontSize: '1.125rem', fontWeight: 700, letterSpacing: '-0.01em' },
+          h6: { fontSize: '0.9375rem', fontWeight: 600 },
+          subtitle1: { fontSize: '0.875rem', fontWeight: 600 },
+          subtitle2: { fontSize: '0.8125rem', fontWeight: 600 },
+          caption: {
+            fontSize: '0.6875rem',
+            fontWeight: 600,
+            letterSpacing: '0.06em',
+            lineHeight: 1.4,
+          },
+          button: { textTransform: 'none', fontWeight: 600, fontSize: '0.8125rem' },
         },
         components: {
           MuiCssBaseline: {
             styleOverrides: {
-              body: {
-                backgroundImage:
-                  'radial-gradient(circle at top, rgba(12, 123, 220, 0.12), transparent 38%)',
-              },
+              body: ({ theme }: { theme: Theme }) => ({
+                backgroundColor: CRM.ink[50],
+                backgroundImage: 'none',
+                WebkitFontSmoothing: 'antialiased',
+                ...theme.applyStyles('dark', {
+                  backgroundColor: theme.palette.background.default,
+                }),
+              }),
             },
           },
           MuiPaper: {
             styleOverrides: {
               root: {
                 backgroundImage: 'none',
+                borderRadius: CRM.radius.xl,
               },
               outlined: ({ theme }) => ({
-                borderColor: 'rgba(12, 123, 220, 0.12)',
+                borderColor: CRM.ink[200],
                 ...theme.applyStyles('dark', {
-                  borderColor: 'rgba(104, 180, 255, 0.16)',
+                  borderColor: 'rgba(199, 204, 209, 0.22)',
                 }),
               }),
             },
           },
+          MuiCard: {
+            styleOverrides: {
+              root: {
+                borderRadius: CRM.radius.xl,
+                boxShadow: CRM.shadow.card,
+              },
+            },
+          },
           MuiButton: {
             styleOverrides: {
+              root: {
+                borderRadius: CRM.radius.md,
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '0.8125rem',
+                boxShadow: 'none',
+              },
+              containedPrimary: {
+                backgroundColor: CRM.brand.DEFAULT,
+                '&:hover': { backgroundColor: CRM.brand.hover },
+                '&:active': { backgroundColor: CRM.brand.active },
+              },
+              outlined: ({ theme }) => ({
+                borderWidth: '1px',
+                borderColor: CRM.ink[200],
+                color: CRM.ink[700],
+                '&:hover': {
+                  borderColor: CRM.ink[200],
+                  backgroundColor: CRM.ink[50],
+                  color: CRM.ink[900],
+                },
+                ...theme.applyStyles('dark', {
+                  borderColor: 'rgba(199, 204, 209, 0.28)',
+                  color: theme.palette.text.secondary,
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.06)',
+                    color: theme.palette.text.primary,
+                  },
+                }),
+              }),
               text: ({ theme }) => ({
                 color: theme.palette.text.secondary,
                 ...theme.applyStyles('dark', {
@@ -119,14 +198,42 @@ export function ThemeRegistry({
               }),
             },
           },
+          MuiOutlinedInput: {
+            styleOverrides: {
+              root: {
+                borderRadius: CRM.radius.md,
+                '&.Mui-focused': {
+                  boxShadow: CRM.shadow.ringFocus,
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderWidth: '1.5px',
+                  borderColor: CRM.brand.DEFAULT,
+                },
+              },
+              notchedOutline: {
+                borderColor: CRM.ink[200],
+              },
+            },
+          },
+          MuiTextField: {
+            defaultProps: { variant: 'outlined', size: 'small' },
+          },
+          MuiLink: {
+            styleOverrides: {
+              root: {
+                fontWeight: 600,
+              },
+            },
+          },
           MuiToggleButtonGroup: {
             styleOverrides: {
               root: ({ theme }) => ({
                 borderRadius: 20,
-                border: `1px solid ${theme.palette.divider}`,
-                backgroundColor: 'rgba(255,255,255,0.65)',
+                border: `1px solid ${CRM.ink[200]}`,
+                backgroundColor: '#ffffff',
                 ...theme.applyStyles('dark', {
-                  backgroundColor: 'rgba(23, 40, 60, 0.82)',
+                  borderColor: 'rgba(199, 204, 209, 0.22)',
+                  backgroundColor: 'rgba(24, 28, 32, 0.6)',
                 }),
               }),
               grouped: ({ theme }) => ({

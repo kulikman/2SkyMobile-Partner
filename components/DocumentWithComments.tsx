@@ -335,20 +335,14 @@ export function DocumentWithComments({
           sx={[
             {
               p: { xs: 2.5, md: 4 },
-              borderRadius: 5,
-              borderColor: 'rgba(74, 112, 147, 0.18)',
-              background:
-                'linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(248,251,255,0.98) 100%)',
+              borderRadius: '14px',
+              bgcolor: 'background.paper',
+              boxShadow: '0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04)',
               userSelect: 'text',
               WebkitUserSelect: 'text',
               WebkitTouchCallout: 'default',
             },
-            (theme) =>
-              theme.applyStyles('dark', {
-                borderColor: 'rgba(112, 163, 215, 0.18)',
-                background:
-                  'linear-gradient(180deg, rgba(17, 28, 43, 0.98) 0%, rgba(12, 21, 33, 0.98) 100%)',
-              }),
+            (theme) => theme.applyStyles('dark', { bgcolor: 'background.paper' }),
           ]}
         >
           <Stack spacing={2.5}>
@@ -357,14 +351,14 @@ export function DocumentWithComments({
               sx={[
                 {
                   p: 1.75,
-                  borderRadius: 3,
-                  bgcolor: 'rgba(237, 246, 255, 0.9)',
-                  borderColor: 'rgba(68, 140, 189, 0.22)',
+                  borderRadius: '10px',
+                  bgcolor: '#E0F2FE',
+                  borderColor: '#B8E0FF',
                 },
                 (theme) =>
                   theme.applyStyles('dark', {
-                    bgcolor: 'rgba(18, 44, 72, 0.7)',
-                    borderColor: 'rgba(104, 180, 255, 0.22)',
+                    bgcolor: 'rgba(0, 124, 219, 0.12)',
+                    borderColor: 'rgba(184, 224, 255, 0.35)',
                   }),
               ]}
             >
@@ -551,8 +545,7 @@ export function DocumentWithComments({
             },
             (theme) =>
               theme.applyStyles('dark', {
-                backgroundImage:
-                  'linear-gradient(180deg, rgba(17, 28, 43, 0.98) 0%, rgba(12, 21, 33, 0.98) 100%)',
+                bgcolor: 'background.paper',
               }),
           ]}
         >

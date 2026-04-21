@@ -11,6 +11,13 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (user.user_metadata?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
   const {
     title,
     slug,
@@ -26,7 +33,7 @@ export async function POST(req: NextRequest) {
     report_type = null,
     report_period_start = null,
     report_period_end = null,
-  } = await req.json();
+  } = body;
   if (!title || !slug || !content) {
     return NextResponse.json({ error: "title, slug and content are required" }, { status: 400 });
   }

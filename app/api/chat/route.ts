@@ -22,7 +22,13 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { folderId, content } = await req.json();
+  let body: { folderId?: string; content?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+  const { folderId, content } = body;
   if (!folderId || !content?.trim()) {
     return NextResponse.json({ error: 'folderId and content are required' }, { status: 400 });
   }

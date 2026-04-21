@@ -13,7 +13,13 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const body = await request.json();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
   const updates: Record<string, unknown> = {};
   if (body.title !== undefined)       updates.title       = body.title;
   if (body.description !== undefined) updates.description = body.description;

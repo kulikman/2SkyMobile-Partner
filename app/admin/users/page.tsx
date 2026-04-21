@@ -21,7 +21,7 @@ export default async function AdminUsersPage() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Navbar isAdmin />
+      <Navbar isAdmin userId={user.id} />
       <Container maxWidth="md" sx={{ py: 5 }}>
         <Stack spacing={4}>
           <div>

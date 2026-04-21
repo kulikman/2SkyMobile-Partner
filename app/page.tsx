@@ -43,7 +43,7 @@ export default async function HomePage() {
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
-      <Navbar isAdmin={isAdmin} />
+      <Navbar isAdmin={isAdmin} userId={user.id} />
       <Container maxWidth="xl" sx={{ py: 4 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
           <Typography variant="h4" fontWeight={800}>

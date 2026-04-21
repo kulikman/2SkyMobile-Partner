@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
 
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from('roadmap_items')
+    .from('tasks')
     .select('*')
     .eq('folder_id', folderId)
     .order('position', { ascending: true });
@@ -19,32 +19,30 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (user.user_metadata?.role !== 'admin') {
+  if (!user || user.user_metadata?.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  const { folderId, title, description, status, position, due_date } = body;
-  if (!folderId || !title) {
-    return NextResponse.json({ error: 'folderId and title are required' }, { status: 400 });
+  try { body = await req.json(); }
+  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
+
+  const { folder_id, group_label, title, type, role, estimated_hours,
+    depends_on, position, start_date, due_date, description } = body;
+
+  if (!folder_id || !title?.trim()) {
+    return NextResponse.json({ error: 'folder_id and title are required' }, { status: 400 });
   }
 
   const { data, error } = await supabase
-    .from('roadmap_items')
+    .from('tasks')
     .insert({
-      folder_id: folderId,
-      title,
-      description: description ?? null,
-      status: status ?? 'pending',
-      position: position ?? 0,
-      due_date: due_date ?? null,
+      folder_id, group_label: group_label ?? null, title: title.trim(),
+      description: description ?? null, type: type ?? null, role: role ?? null,
+      estimated_hours: estimated_hours ?? null, depends_on: depends_on ?? [],
+      position: position ?? 0, start_date: start_date ?? null,
+      due_date: due_date ?? null, status: 'backlog',
     })
     .select()
     .single();

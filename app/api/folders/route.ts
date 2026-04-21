@@ -18,10 +18,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
   const {
     name, color, icon, position, parent_id = null,
     status, progress, client_name, started_at, deadline_at,
-  } = await request.json();
+  } = body;
   const { data, error } = await supabase
     .from('folders')
     .insert({

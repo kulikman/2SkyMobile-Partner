@@ -166,31 +166,6 @@ const FOLDER_ICON_MAP: Record<string, React.ElementType> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function createExcerpt(text: string, max = 160): string {
-  const cleaned = text
-    .replace(/^---[\s\S]*?---/m, "")
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
-    .trim();
-
-  const para =
-    cleaned
-      .split(/\n\s*\n/)
-      .map((p) => p.trim())
-      .filter(Boolean)
-      .filter((p) => !/^#{1,6}\s/.test(p))
-      .filter((p) => !/^\s*[-*+]\s/.test(p))[0] || cleaned;
-
-  const result = para
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
-    .replace(/[*_`>#-]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  return result.length > max ? result.slice(0, max).trim() + "…" : result;
-}
-
 function buildBoardItems(docs: DocForBoard[], folders: FolderForBoard[]): BoardItem[] {
   const folderedDocs = new Map<string, DocForBoard[]>();
   folders.forEach((f) => folderedDocs.set(f.id, []));

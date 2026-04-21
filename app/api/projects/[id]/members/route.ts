@@ -50,7 +50,14 @@ export async function POST(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { userId } = await request.json();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+  const { userId } = body;
   if (!userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
 
   const adminClient = await createAdminClient();

@@ -2,11 +2,30 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function proxy(request: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl?.trim() || !supabaseAnonKey?.trim()) {
+    return new NextResponse(
+      [
+        'Missing Supabase environment variables.',
+        '',
+        '1. Create or edit `.env.local` in the project root (same folder as `package.json`).',
+        '2. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY from:',
+        '   https://supabase.com/dashboard/project/_/settings/api',
+        '3. Restart the dev server (`npm run dev`).',
+        '',
+        '(SUPABASE_SERVICE_ROLE_KEY is also required for admin/server routes.)',
+      ].join('\n'),
+      { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } }
+    );
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -25,9 +44,16 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    return new NextResponse('Authentication service unavailable. Please try again.', {
+      status: 503,
+      headers: { 'content-type': 'text/plain; charset=utf-8' },
+    });
+  }
 
   const { pathname } = request.nextUrl;
 

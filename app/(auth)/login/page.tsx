@@ -38,8 +38,23 @@ export default function LoginPage() {
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default' }}>
-      <Paper elevation={3} sx={{ width: '100%', maxWidth: 420, p: 4, borderRadius: 3 }}>
-        <Typography variant="h5" fontWeight={700} mb={3}>Sign in to Threadoc</Typography>
+      <Paper
+        variant="outlined"
+        elevation={0}
+        sx={{
+          width: '100%',
+          maxWidth: 380,
+          p: 3.5,
+          borderRadius: '14px',
+          boxShadow: '0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04)',
+        }}
+      >
+        <Typography variant="h5" fontWeight={700} sx={{ fontSize: '1.25rem', mb: 0.5 }}>
+          Sign in
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+          Enter your credentials to continue.
+        </Typography>
         <form onSubmit={handleSubmit}>
           <Stack spacing={2}>
             <TextField

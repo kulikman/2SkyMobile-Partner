@@ -4,14 +4,14 @@ import { buildInitialComments } from '@/lib/comment-view-models';
 import { getDisplayName } from '@/lib/user-display';
 
 export async function POST(req: NextRequest) {
-  const {
-    documentId,
-    content,
-    anchorText,
-    anchorStart,
-    anchorEnd,
-    anonymousName,
-  } = await req.json();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+  const { documentId, content, anchorText, anchorStart, anchorEnd, anonymousName } = body;
 
   if (!documentId || !content) {
     return NextResponse.json({ error: 'documentId and content are required' }, { status: 400 });

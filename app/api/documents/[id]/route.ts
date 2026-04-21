@@ -17,6 +17,13 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
   const {
     title,
     slug,
@@ -28,7 +35,7 @@ export async function PATCH(
     publicAccessEnabled = false,
     publicCommentsVisible = false,
     anonymousCommentsEnabled = false,
-  } = await req.json();
+  } = body;
   if (!title || !slug || !content) {
     return NextResponse.json({ error: 'title, slug and content are required' }, { status: 400 });
   }

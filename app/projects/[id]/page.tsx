@@ -8,10 +8,14 @@ import Link from 'next/link';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { Navbar } from '@/components/Navbar';
 import { ProjectDetail } from '@/components/ProjectDetail';
+import { TasksView } from '@/components/TasksView';
+import { TechStackEditor } from '@/components/TechStackEditor';
 import { getDisplayName } from '@/lib/user-display';
 import type { ProjectData } from '@/components/ProjectDetail';
 import type { RoadmapItem } from '@/components/RoadmapView';
 import type { ReportDoc } from '@/components/ReportList';
+import type { Task } from '@/components/TasksView';
+import Paper from '@mui/material/Paper';
 
 export default async function ProjectPage({
   params,
@@ -62,7 +66,7 @@ export default async function ProjectPage({
     deadline_at: folder.deadline_at ?? null,
   };
 
-  // Fetch roadmap items
+  // Fetch roadmap items (legacy)
   const { data: rawRoadmap } = await supabase
     .from('roadmap_items')
     .select('*')
@@ -81,13 +85,29 @@ export default async function ProjectPage({
     created_at: r.created_at,
   }));
 
+  // Fetch tasks
+  const { data: rawTasks } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('folder_id', id)
+    .order('position', { ascending: true });
+
+  const tasks: Task[] = (rawTasks ?? []).map((t) => ({
+    id: t.id, folder_id: t.folder_id,
+    group_label: t.group_label ?? null, title: t.title,
+    description: t.description ?? null, type: t.type ?? null,
+    role: t.role ?? null, status: t.status ?? 'backlog',
+    estimated_hours: t.estimated_hours ?? null,
+    start_date: t.start_date ?? null, due_date: t.due_date ?? null,
+    completed_at: t.completed_at ?? null, created_at: t.created_at,
+  }));
+
   // Fetch reports (documents in this folder)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: rawDocs } = await (supabase
+  const { data: rawDocs } = await supabase
     .from('documents')
     .select('id, slug, title, description, report_type, report_period_start, report_period_end, created_at')
     .eq('folder_id', id)
-    .order('created_at', { ascending: false }) as any);
+    .order('created_at', { ascending: false });
 
   const reports: ReportDoc[] = (rawDocs ?? []).map((d: Record<string, unknown>) => ({
     id: d.id as string,
@@ -111,7 +131,7 @@ export default async function ProjectPage({
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Navbar isAdmin={isAdmin} />
+      <Navbar isAdmin={isAdmin} userId={user.id} />
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Breadcrumbs sx={{ mb: 3 }}>
           <Link href="/" style={{ textDecoration: 'none' }}>
@@ -131,6 +151,26 @@ export default async function ProjectPage({
           currentUser={currentUser}
           isAdmin={isAdmin}
         />
+
+        {/* Tech Stack */}
+        <Paper variant="outlined" sx={{ borderRadius: 3, p: 3, mt: 3 }}>
+          <TechStackEditor
+            folderId={id}
+            initialSpec={(folder as Record<string, unknown>).tech_spec as Record<string, string> | null ?? null}
+            isAdmin={isAdmin}
+          />
+        </Paper>
+
+        {/* Tasks */}
+        <Box mt={3}>
+          <TasksView
+            initialTasks={tasks}
+            folderId={id}
+            projectStartAt={folder.started_at ?? null}
+            isAdmin={isAdmin}
+            currentUser={currentUser}
+          />
+        </Box>
       </Container>
     </Box>
   );

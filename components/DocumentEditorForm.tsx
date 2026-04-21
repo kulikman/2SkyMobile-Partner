@@ -289,15 +289,13 @@ export function DocumentEditorForm({
         sx={[
           {
             p: { xs: 2.5, md: 3.5 },
-            borderRadius: 3,
-            background:
-              'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(250,247,242,0.98) 100%)',
+            borderRadius: '14px',
+            bgcolor: 'background.paper',
+            boxShadow: '0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04)',
           },
           (theme) =>
             theme.applyStyles('dark', {
-              borderColor: 'rgba(112, 163, 215, 0.18)',
-              background:
-                'linear-gradient(180deg, rgba(17, 28, 43, 0.98) 0%, rgba(12, 21, 33, 0.98) 100%)',
+              bgcolor: 'background.paper',
             }),
         ]}
       >

@@ -5,17 +5,14 @@ import PrintIcon from '@mui/icons-material/Print';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 
-export function DownloadButtons({
-  title,
-  content,
-  slug,
-  printPath,
-}: {
-  title: string;
+export function DownloadButtons(props: {
+  /** Optional; kept for call sites that pass document title. */
+  title?: string;
   content: string;
   slug: string;
   printPath?: string;
 }) {
+  const { content, slug, printPath } = props;
   function downloadMd() {
     const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);

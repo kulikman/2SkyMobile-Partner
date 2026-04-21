@@ -9,8 +9,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ThemeModeToggle } from '@/components/ThemeModeToggle';
+import { NotificationsMenu } from '@/components/NotificationsMenu';
 
-export function Navbar({ isAdmin }: { isAdmin: boolean }) {
+export function Navbar({ isAdmin, userId }: { isAdmin: boolean; userId?: string }) {
   const router = useRouter();
 
   async function handleLogout() {
@@ -26,22 +27,18 @@ export function Navbar({ isAdmin }: { isAdmin: boolean }) {
         elevation={0}
         variant="outlined"
         sx={[
-          {
+          (theme) => ({
             px: { xs: 1.5, md: 2.25 },
             py: 1.25,
-            borderRadius: { xs: 3, md: 5 },
-            backdropFilter: 'blur(14px)',
-            bgcolor: 'rgba(255,255,255,0.82)',
-            backgroundImage:
-              'linear-gradient(180deg, rgba(255,255,255,0.88) 0%, rgba(244, 249, 255, 0.82) 100%)',
-            boxShadow: '0 10px 30px rgba(12, 35, 64, 0.08)',
-          },
+            borderRadius: '14px',
+            bgcolor: 'background.paper',
+            backgroundImage: 'none',
+            borderColor: theme.palette.divider,
+            boxShadow: '0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04)',
+          }),
           (theme) =>
             theme.applyStyles('dark', {
-              bgcolor: 'rgba(11, 20, 32, 0.84)',
-              backgroundImage:
-                'linear-gradient(180deg, rgba(20, 33, 50, 0.96) 0%, rgba(11, 20, 32, 0.92) 100%)',
-              boxShadow: '0 14px 36px rgba(0, 0, 0, 0.35)',
+              boxShadow: '0 4px 16px rgba(0,0,0,.25)',
             }),
         ]}
       >
@@ -92,17 +89,30 @@ export function Navbar({ isAdmin }: { isAdmin: boolean }) {
               Projects
             </Button>
             {isAdmin && (
-              <Button
-                component={Link}
-                href="/admin/users"
-                size="small"
-                variant="text"
-                color="inherit"
-                sx={{ minWidth: { xs: 'auto', md: 64 }, px: { xs: 1, md: 1.5 } }}
-              >
-                Admin
-              </Button>
+              <>
+                <Button
+                  component={Link}
+                  href="/admin/companies"
+                  size="small"
+                  variant="text"
+                  color="inherit"
+                  sx={{ minWidth: { xs: 'auto', md: 64 }, px: { xs: 1, md: 1.5 } }}
+                >
+                  Companies
+                </Button>
+                <Button
+                  component={Link}
+                  href="/admin/users"
+                  size="small"
+                  variant="text"
+                  color="inherit"
+                  sx={{ minWidth: { xs: 'auto', md: 64 }, px: { xs: 1, md: 1.5 } }}
+                >
+                  Admin
+                </Button>
+              </>
             )}
+            {userId && <NotificationsMenu userId={userId} />}
             <ThemeModeToggle />
             <Button
               onClick={handleLogout}
@@ -111,7 +121,6 @@ export function Navbar({ isAdmin }: { isAdmin: boolean }) {
               sx={{
                 ml: { xs: 0, md: 0.5 },
                 px: { xs: 1.5, md: 2 },
-                borderRadius: 2,
               }}
             >
               Log out
