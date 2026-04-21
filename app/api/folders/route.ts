@@ -28,6 +28,7 @@ export async function POST(request: Request) {
   const {
     name, color, icon, position, parent_id = null,
     status, progress, client_name, started_at, deadline_at,
+    company_id, stage_url,
   } = body;
   const { data, error } = await supabase
     .from('folders')
@@ -42,6 +43,8 @@ export async function POST(request: Request) {
       client_name: client_name ?? null,
       started_at: started_at ?? null,
       deadline_at: deadline_at ?? null,
+      company_id: company_id ?? null,
+      stage_url: stage_url ?? null,
     })
     .select()
     .single();

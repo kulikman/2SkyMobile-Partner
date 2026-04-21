@@ -85,7 +85,7 @@ export function AdminProjectsClient({
   // Create dialog
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newClientName, setNewClientName] = useState('');
+  const [newCompanyId, setNewCompanyId] = useState('');
   const [newStatus, setNewStatus] = useState('in_discussion');
   const [creating, setCreating] = useState(false);
 
@@ -126,7 +126,8 @@ export function AdminProjectsClient({
       body: JSON.stringify({
         name: newName.trim(),
         status: newStatus,
-        client_name: newClientName.trim() || null,
+        company_id: newCompanyId || null,
+        client_name: companies.find((c) => c.id === newCompanyId)?.name ?? null,
         position: projects.length,
       }),
     });
@@ -147,7 +148,7 @@ export function AdminProjectsClient({
       }]);
       setCreateOpen(false);
       setNewName('');
-      setNewClientName('');
+      setNewCompanyId('');
       setNewStatus('in_discussion');
     }
     setCreating(false);
@@ -328,7 +329,7 @@ export function AdminProjectsClient({
 
       {/* Create Project Dialog */}
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>New project</DialogTitle>
+        <DialogTitle fontWeight={700}>New project</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
@@ -339,11 +340,18 @@ export function AdminProjectsClient({
               autoFocus
             />
             <TextField
-              label="Client name"
-              value={newClientName}
-              onChange={(e) => setNewClientName(e.target.value)}
+              label="Company"
+              select
+              value={newCompanyId}
+              onChange={(e) => setNewCompanyId(e.target.value)}
               fullWidth
-            />
+              helperText="The client company this project belongs to"
+            >
+              <MenuItem value="">— No company —</MenuItem>
+              {companies.map((c) => (
+                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+              ))}
+            </TextField>
             <TextField
               label="Status"
               select
@@ -356,10 +364,10 @@ export function AdminProjectsClient({
             </TextField>
           </Stack>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
           <Button variant="contained" disabled={creating || !newName.trim()} onClick={createProject}>
-            Create
+            {creating ? 'Creating…' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
