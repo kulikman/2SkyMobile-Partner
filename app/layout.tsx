@@ -13,11 +13,11 @@ const figtree = Figtree({
 });
 
 export const metadata: Metadata = {
-  title: 'Threadoc',
-  description: 'TD collaborative reading and annotation workspace',
+  title: 'Partner Dev 2SkyMobile',
+  description: '2SkyMobile Partner Development Portal',
   icons: {
-    icon: '/td-logo.svg',
-    shortcut: '/td-logo.svg',
+    icon: '/logo.svg',
+    shortcut: '/logo.svg',
   },
 };
 

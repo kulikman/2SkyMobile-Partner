@@ -57,7 +57,7 @@ export function Navbar({ isAdmin, userId }: { isAdmin: boolean; userId?: string 
                 component="img"
                 src="/logo.svg"
                 alt="2SkyMobile"
-                sx={{ height: 24 }}
+                sx={{ height: 48 }}
               />
             </Box>
           </Stack>

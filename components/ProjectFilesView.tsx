@@ -17,6 +17,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 import { createClient } from '@/lib/supabase/client';
 
+// createClient kept for download signed URL only
 type ProjectFile = {
   id: string;
   folder_id: string;
@@ -72,14 +73,15 @@ export function ProjectFilesView({
       const { signedUrl, storagePath, error: urlErr } = await res.json();
       if (urlErr) throw new Error(urlErr);
 
-      // 2. Upload file directly to Supabase Storage via signed URL
-      const supabase = createClient();
+      // 2. Upload file directly via signed URL (PUT)
       setUploadProgress(50);
-      const { error: uploadErr } = await supabase.storage
-        .from('project-files')
-        .uploadToSignedUrl(storagePath, signedUrl, file);
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      });
       setUploadProgress(90);
-      if (uploadErr) throw new Error(uploadErr.message);
+      if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status}`);
 
       // 3. Save metadata
       const metaRes = await fetch('/api/projects/files', {

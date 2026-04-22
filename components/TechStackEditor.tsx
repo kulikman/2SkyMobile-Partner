@@ -9,6 +9,7 @@ import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import Alert from '@mui/material/Alert';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 
@@ -45,6 +46,7 @@ export function TechStackEditor({ folderId, initialSpec, isAdmin }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<TechSpec>({});
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const hasContent = Object.values(spec).some((v) => v?.trim());
 
@@ -55,6 +57,7 @@ export function TechStackEditor({ folderId, initialSpec, isAdmin }: Props) {
 
   async function handleSave() {
     setSaving(true);
+    setSaveError('');
     const res = await fetch(`/api/folders/${folderId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -64,6 +67,9 @@ export function TechStackEditor({ folderId, initialSpec, isAdmin }: Props) {
     if (res.ok) {
       setSpec(draft);
       setEditing(false);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setSaveError(data.error ?? 'Failed to save');
     }
   }
 
@@ -85,6 +91,7 @@ export function TechStackEditor({ folderId, initialSpec, isAdmin }: Props) {
             </Button>
           </Stack>
         </Stack>
+        {saveError && <Alert severity="error" onClose={() => setSaveError('')}>{saveError}</Alert>}
         <Grid container spacing={2}>
           {FIELDS.map(({ key, label }) => (
             <Grid key={key} size={{ xs: 12, sm: key === 'notes' ? 12 : 6 }}>

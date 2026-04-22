@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -422,6 +423,7 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin }: P
   const [importOpen, setImportOpen] = useState(false);
   const [filterRole, setFilterRole] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [importError, setImportError] = useState('');
 
   function toggleGroup(label: string) {
     setCollapsedGroups((prev) => {
@@ -437,12 +439,15 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin }: P
 
   async function handleImported() {
     setImportOpen(false);
+    setImportError('');
     try {
       const r = await fetch(`/api/tasks?folderId=${folderId}`);
       const data = await r.json();
       if (Array.isArray(data)) {
         setTasks(data);
+        router.refresh();
       } else {
+        setImportError(data?.error ?? 'Failed to load imported tasks');
         router.refresh();
       }
     } catch {
@@ -573,6 +578,12 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin }: P
       )}
 
       <CommentsDrawer task={activeTask} onClose={() => setActiveTask(null)} />
+
+      {importError && (
+        <Alert severity="error" onClose={() => setImportError('')} sx={{ mt: 2 }}>
+          Import error: {importError}
+        </Alert>
+      )}
 
       {isAdmin && (
         <TaskImportDialog

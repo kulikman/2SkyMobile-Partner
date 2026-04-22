@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 export async function PATCH(
@@ -20,32 +20,27 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
   const updates: Record<string, unknown> = {};
-  if (body.name !== undefined)       updates.name        = body.name;
-  if (body.color !== undefined)      updates.color       = body.color;
-  if (body.icon !== undefined)       updates.icon        = body.icon;
-  if (body.position !== undefined)   updates.position    = body.position;
-  if (body.parent_id !== undefined)  updates.parent_id   = body.parent_id;
-  if (body.status !== undefined)     updates.status      = body.status;
-  if (body.progress !== undefined)   updates.progress    = body.progress;
+  if (body.name !== undefined)        updates.name        = body.name;
+  if (body.color !== undefined)       updates.color       = body.color;
+  if (body.icon !== undefined)        updates.icon        = body.icon;
+  if (body.position !== undefined)    updates.position    = body.position;
+  if (body.parent_id !== undefined)   updates.parent_id   = body.parent_id;
+  if (body.status !== undefined)      updates.status      = body.status;
+  if (body.progress !== undefined)    updates.progress    = body.progress;
   if (body.client_name !== undefined) updates.client_name = body.client_name;
-  if (body.started_at !== undefined) updates.started_at  = body.started_at;
+  if (body.started_at !== undefined)  updates.started_at  = body.started_at;
   if (body.deadline_at !== undefined) updates.deadline_at = body.deadline_at;
   if (body.company_id !== undefined)  updates.company_id  = body.company_id;
   if (body.stage_url !== undefined)   updates.stage_url   = body.stage_url;
   if (body.tech_spec !== undefined)   updates.tech_spec   = body.tech_spec;
 
-  let { data, error } = await supabase
+  const adminClient = await createAdminClient();
+  const { data, error } = await adminClient
     .from('folders')
     .update(updates)
     .eq('id', id)
     .select()
     .single();
-
-  // stage_url column may not exist yet (migration pending) — retry without it
-  if (error?.message?.includes('stage_url')) {
-    delete updates.stage_url;
-    ({ data, error } = await supabase.from('folders').update(updates).eq('id', id).select().single());
-  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);

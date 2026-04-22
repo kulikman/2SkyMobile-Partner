@@ -16,6 +16,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 
 type AdminUser = {
   id: string;
@@ -33,11 +34,15 @@ export function AdminUsersClient({
   const [admins, setAdmins] = useState<AdminUser[]>(initialAdmins);
   const [addOpen, setAddOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
+  const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+
+  const [editEmail, setEditEmail] = useState('');
+  const [editPassword, setEditPassword] = useState('');
 
   async function handleAdd() {
     if (!newEmail.trim() || !newPassword.trim()) {
@@ -69,6 +74,39 @@ export function AdminUsersClient({
     setDeleteTarget(null);
   }
 
+  function openEdit(u: AdminUser) {
+    setEditTarget(u);
+    setEditEmail(u.email);
+    setEditPassword('');
+    setError('');
+  }
+
+  async function handleEdit() {
+    if (!editTarget) return;
+    if (!editEmail.trim() && !editPassword.trim()) {
+      setError('Enter a new email or password');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body: Record<string, any> = {};
+    if (editEmail.trim() !== editTarget.email) body.email = editEmail.trim();
+    if (editPassword.trim()) body.password = editPassword;
+    if (Object.keys(body).length === 0) { setSaving(false); setEditTarget(null); return; }
+
+    const res = await fetch(`/api/admin/users/${editTarget.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    setSaving(false);
+    if (!res.ok) { setError(data.error ?? 'Error'); return; }
+    setAdmins((prev) => prev.map((u) => u.id === editTarget.id ? { ...u, email: data.email } : u));
+    setEditTarget(null);
+  }
+
   return (
     <>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
@@ -98,16 +136,21 @@ export function AdminUsersClient({
                   Added {new Date(u.created_at).toLocaleDateString()}
                 </Typography>
               </Box>
-              {u.id !== currentUserId && (
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() => setDeleteTarget(u)}
-                  title="Remove admin"
-                >
-                  <DeleteIcon fontSize="small" />
+              <Stack direction="row" spacing={0.5}>
+                <IconButton size="small" onClick={() => openEdit(u)} title="Edit">
+                  <EditIcon fontSize="small" />
                 </IconButton>
-              )}
+                {u.id !== currentUserId && (
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => setDeleteTarget(u)}
+                    title="Remove admin"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                )}
+              </Stack>
             </Stack>
             {i < admins.length - 1 && <Divider />}
           </Box>
@@ -141,6 +184,37 @@ export function AdminUsersClient({
           <Button onClick={() => setAddOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleAdd} disabled={saving}>
             {saving ? 'Adding…' : 'Add'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit admin dialog */}
+      <Dialog open={!!editTarget} onClose={() => setEditTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle fontWeight={700}>Edit team member</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Email"
+              type="email"
+              value={editEmail}
+              onChange={(e) => setEditEmail(e.target.value)}
+              fullWidth
+              autoFocus
+            />
+            <TextField
+              label="New password (leave blank to keep)"
+              type="password"
+              value={editPassword}
+              onChange={(e) => setEditPassword(e.target.value)}
+              fullWidth
+            />
+            {error && <Typography variant="caption" color="error">{error}</Typography>}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEditTarget(null)}>Cancel</Button>
+          <Button variant="contained" onClick={handleEdit} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -57,7 +57,8 @@ export function ProjectTabs({
         <Tab label="Reports" />
       </Tabs>
 
-      {tab === 0 && (
+      {/* Keep all tabs mounted (display:none) so state survives tab switches */}
+      <Box sx={{ display: tab === 0 ? 'block' : 'none' }}>
         <TasksView
           initialTasks={initialTasks}
           folderId={folderId}
@@ -65,43 +66,43 @@ export function ProjectTabs({
           isAdmin={isAdmin}
           currentUser={currentUser}
         />
-      )}
+      </Box>
 
-      {tab === 1 && (
+      <Box sx={{ display: tab === 1 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
           <IssuesView folderId={folderId} isAdmin={isAdmin} />
         </Paper>
-      )}
+      </Box>
 
-      {tab === 2 && (
+      <Box sx={{ display: tab === 2 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
           <RoadmapView items={roadmapItems} folderId={folderId} isAdmin={isAdmin} />
         </Paper>
-      )}
+      </Box>
 
-      {tab === 3 && (
+      <Box sx={{ display: tab === 3 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
           <MeetingsView folderId={folderId} isAdmin={isAdmin} />
         </Paper>
-      )}
+      </Box>
 
-      {tab === 4 && (
+      <Box sx={{ display: tab === 4 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
           <ProjectFilesView folderId={folderId} isAdmin={isAdmin} />
         </Paper>
-      )}
+      </Box>
 
-      {tab === 5 && (
+      <Box sx={{ display: tab === 5 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
           <TechStackEditor folderId={folderId} initialSpec={initialSpec} isAdmin={isAdmin} />
         </Paper>
-      )}
+      </Box>
 
-      {tab === 6 && (
+      <Box sx={{ display: tab === 6 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
           <ReportList reports={reports} folderId={folderId} isAdmin={isAdmin} />
         </Paper>
-      )}
+      </Box>
     </Box>
   );
 }
