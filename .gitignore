@@ -22,6 +22,7 @@
 .claude/
 supabase/.temp/
 supabase/**/.temp/
+supabase/migrations/supabase/
 
 # misc
 .DS_Store
