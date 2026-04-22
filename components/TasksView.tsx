@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -410,7 +411,11 @@ type Props = {
 };
 
 export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin }: Props) {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
+
+  useEffect(() => { setTasks(initialTasks); }, [initialTasks]);
+
   const [view, setView] = useState<'table' | 'timeline'>('table');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -430,12 +435,19 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin }: P
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status } : t));
   }
 
-  function handleImported() {
-    // Reload tasks after import
-    fetch(`/api/tasks?folderId=${folderId}`)
-      .then((r) => r.json())
-      .then((data) => { if (Array.isArray(data)) setTasks(data); });
+  async function handleImported() {
     setImportOpen(false);
+    try {
+      const r = await fetch(`/api/tasks?folderId=${folderId}`);
+      const data = await r.json();
+      if (Array.isArray(data)) {
+        setTasks(data);
+      } else {
+        router.refresh();
+      }
+    } catch {
+      router.refresh();
+    }
   }
 
   const filtered = tasks.filter((t) => {

@@ -2,18 +2,13 @@ import { redirect, notFound } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
-import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
-import Paper from '@mui/material/Paper';
 import Link from 'next/link';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { Navbar } from '@/components/Navbar';
 import { ProjectDetail } from '@/components/ProjectDetail';
-import { TasksView } from '@/components/TasksView';
-import { TechStackEditor } from '@/components/TechStackEditor';
-import { MeetingsView } from '@/components/MeetingsView';
-import { ProjectFilesView } from '@/components/ProjectFilesView';
+import { ProjectTabs } from '@/components/ProjectTabs';
 import { getDisplayName } from '@/lib/user-display';
 import type { ProjectData } from '@/components/ProjectDetail';
 import type { RoadmapItem } from '@/components/RoadmapView';
@@ -41,12 +36,14 @@ export default async function ProjectPage({
 
   if (error || !folder) notFound();
 
+  const adminClient = await createAdminClient();
+
   if (!isAdmin) {
-    const adminClient = await createAdminClient();
+    if (!folder.company_id) notFound();
     const { data: membership } = await adminClient
-      .from('project_members')
+      .from('company_members')
       .select('id')
-      .eq('folder_id', id)
+      .eq('company_id', folder.company_id)
       .eq('user_id', user.id)
       .single();
     if (!membership) notFound();
@@ -62,10 +59,17 @@ export default async function ProjectPage({
     status: folder.status ?? 'in_discussion',
     progress: folder.progress ?? 0,
     client_name: folder.client_name ?? null,
+    company_id: (f.company_id as string) ?? null,
     started_at: folder.started_at ?? null,
     deadline_at: folder.deadline_at ?? null,
     stage_url: (f.stage_url as string) ?? null,
   };
+  const { data: rawCompanies } = await adminClient
+    .from('companies')
+    .select('id, name')
+    .order('name', { ascending: true });
+
+  const companies = (rawCompanies ?? []).map((c) => ({ id: c.id as string, name: c.name as string }));
 
   const { data: rawRoadmap } = await supabase
     .from('roadmap_items')
@@ -135,46 +139,25 @@ export default async function ProjectPage({
           <Typography color="text.primary" fontWeight={600}>{project.name}</Typography>
         </Breadcrumbs>
 
-        {/* Header + Roadmap + Reports + Chat */}
+        {/* Project header */}
         <ProjectDetail
           project={project}
-          roadmapItems={roadmapItems}
-          reports={reports}
+          companies={companies}
           currentUser={currentUser}
           isAdmin={isAdmin}
         />
 
-        {/* Tasks */}
-        <Box mt={3}>
-          <TasksView
-            initialTasks={tasks}
-            folderId={id}
-            projectStartAt={folder.started_at ?? null}
-            isAdmin={isAdmin}
-            currentUser={currentUser}
-          />
-        </Box>
-
-        {/* Meetings */}
-        <Paper variant="outlined" sx={{ borderRadius: 3, p: 3, mt: 3 }}>
-          <MeetingsView folderId={id} isAdmin={isAdmin} />
-        </Paper>
-
-        {/* Documentation */}
-        <Paper variant="outlined" sx={{ borderRadius: 3, p: 3, mt: 3 }}>
-          <ProjectFilesView folderId={id} isAdmin={isAdmin} />
-        </Paper>
-
-        {/* Tech Stack */}
-        <Paper variant="outlined" sx={{ borderRadius: 3, p: 3, mt: 3 }}>
-          <TechStackEditor
-            folderId={id}
-            initialSpec={f.tech_spec as Record<string, string> | null ?? null}
-            isAdmin={isAdmin}
-          />
-        </Paper>
-
-        <Divider sx={{ my: 4 }} />
+        {/* Tabbed sections */}
+        <ProjectTabs
+          folderId={id}
+          projectStartAt={folder.started_at ?? null}
+          initialTasks={tasks}
+          roadmapItems={roadmapItems}
+          reports={reports}
+          initialSpec={f.tech_spec as Record<string, string> | null ?? null}
+          isAdmin={isAdmin}
+          currentUser={currentUser}
+        />
       </Container>
     </Box>
   );

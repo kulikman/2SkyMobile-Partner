@@ -34,12 +34,18 @@ export async function PATCH(
   if (body.stage_url !== undefined)   updates.stage_url   = body.stage_url;
   if (body.tech_spec !== undefined)   updates.tech_spec   = body.tech_spec;
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('folders')
     .update(updates)
     .eq('id', id)
     .select()
     .single();
+
+  // stage_url column may not exist yet (migration pending) — retry without it
+  if (error?.message?.includes('stage_url')) {
+    delete updates.stage_url;
+    ({ data, error } = await supabase.from('folders').update(updates).eq('id', id).select().single());
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);

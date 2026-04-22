@@ -103,7 +103,7 @@ export function ThemeRegistry({
             },
           },
         },
-        shape: { borderRadius: CRM.radius.md },
+        shape: { borderRadius: 4 },
         typography: {
           fontFamily: figtreeStack,
           htmlFontSize: 16,
@@ -228,7 +228,7 @@ export function ThemeRegistry({
           MuiToggleButtonGroup: {
             styleOverrides: {
               root: ({ theme }) => ({
-                borderRadius: 20,
+                borderRadius: 4,
                 border: `1px solid ${CRM.ink[200]}`,
                 backgroundColor: '#ffffff',
                 ...theme.applyStyles('dark', {

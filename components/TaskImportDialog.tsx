@@ -10,8 +10,14 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import TableContainerMui from '@mui/material/TableContainer';
 import UploadIcon from '@mui/icons-material/Upload';
 
 type Props = {
@@ -21,6 +27,14 @@ type Props = {
   onClose: () => void;
   onImported: (count: number) => void;
 };
+
+const EXAMPLE_ROWS = [
+  { phase: '0', module: 'Discovery', tasks: 'Requirements, API analysis, UX flows', estimate: '2 weeks' },
+  { phase: '3', module: 'Backend Core', tasks: 'Auth, order mgmt, integrations', estimate: '8–10 weeks' },
+  { phase: '3.1', module: 'Backend', tasks: 'User management', estimate: 'Included' },
+  { phase: '3.2', module: 'Backend', tasks: 'Order service', estimate: 'Included' },
+  { phase: '7', module: 'Testing', tasks: 'QA and validation', estimate: '3 weeks' },
+];
 
 export function TaskImportDialog({ open, folderId, projectStartAt, onClose, onImported }: Props) {
   const [sheetUrl, setSheetUrl] = useState('');
@@ -56,7 +70,7 @@ export function TaskImportDialog({ open, folderId, projectStartAt, onClose, onIm
   }
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogTitle fontWeight={700}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <UploadIcon color="primary" />
@@ -65,29 +79,46 @@ export function TaskImportDialog({ open, folderId, projectStartAt, onClose, onIm
       </DialogTitle>
 
       <DialogContent>
-        <Stack spacing={2.5} sx={{ mt: 1 }}>
+        <Stack spacing={3} sx={{ mt: 1 }}>
+
+          {/* Format description */}
           <Box>
-            <Typography variant="body2" color="text.secondary" mb={1}>
-              Expected sheet columns (in order):
-            </Typography>
-            <Box
-              component="pre"
-              sx={{
-                p: 1.5, borderRadius: 2, bgcolor: 'action.hover',
-                fontFamily: 'monospace', fontSize: 12, overflow: 'auto',
-              }}
-            >
-{`Task / Deliverable | Type | Role | Hours | Depends On
-─────────────────────────────────────────────────────
-Section header row (no Hours = group label)
-Task name           | API  | Backend | 20   |
-Task name           | UI   | UI/UX   | 16   | 1
-Task name           | API  | Mobile  | 40   | 1;2`}
-            </Box>
-            <Typography variant="caption" color="text.secondary">
-              Section header rows (empty Hours column) group the tasks below them.
-              &quot;Depends On&quot; is a semicolon-separated list of row numbers (1-based, skipping headers).
-            </Typography>
+            <Typography variant="subtitle2" mb={1}>Expected sheet format</Typography>
+            <TableContainerMui component={Box} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'action.hover' }}>
+                    {['Phase', 'Module', 'Key Tasks', 'Deliverable', 'Estimate'].map((h) => (
+                      <TableCell key={h} sx={{ fontWeight: 700, fontSize: 12 }}>{h}</TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {EXAMPLE_ROWS.map((r) => (
+                    <TableRow key={r.phase}>
+                      <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{r.phase}</TableCell>
+                      <TableCell sx={{ fontSize: 12 }}>{r.module}</TableCell>
+                      <TableCell sx={{ fontSize: 12, color: 'text.secondary' }}>{r.tasks}</TableCell>
+                      <TableCell sx={{ fontSize: 12, color: 'text.secondary' }}>…</TableCell>
+                      <TableCell sx={{ fontSize: 12, fontStyle: r.estimate === 'Included' ? 'italic' : 'normal', color: r.estimate === 'Included' ? 'text.secondary' : 'text.primary' }}>
+                        {r.estimate}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainerMui>
+            <Stack spacing={0.5} mt={1}>
+              <Typography variant="caption" color="text.secondary">
+                • <strong>Phase</strong>: numeric, e.g. <code>3</code> = group header, <code>3.1</code> = task
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                • <strong>Estimate</strong>: <code>2 weeks</code>, <code>8–10 weeks</code>, or <code>Included</code> (hours distributed from parent)
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                • Sheet must be public: Share → Anyone with the link can view
+              </Typography>
+            </Stack>
           </Box>
 
           <TextField
@@ -96,7 +127,6 @@ Task name           | API  | Mobile  | 40   | 1;2`}
             value={sheetUrl}
             onChange={(e) => setSheetUrl(e.target.value)}
             fullWidth
-            helperText="The sheet must be publicly accessible (Share → Anyone with the link can view)"
           />
 
           <TextField
@@ -105,7 +135,7 @@ Task name           | API  | Mobile  | 40   | 1;2`}
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             fullWidth
-            InputLabelProps={{ shrink: true }}
+            slotProps={{ inputLabel: { shrink: true } }}
             helperText="Task dates are calculated forward from this date, skipping weekends"
           />
 

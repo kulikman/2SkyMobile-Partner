@@ -31,5 +31,5 @@ export const CRM = {
     panel: '0 4px 16px rgba(0,0,0,.10)',
     ringFocus: '0 0 0 3px rgba(0,124,219,.10)',
   },
-  radius: { md: 10, xl: 14 },
+  radius: { md: 4, xl: 4 },
 } as const;

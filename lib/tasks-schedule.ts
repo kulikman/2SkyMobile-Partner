@@ -5,7 +5,6 @@ export type ImportedRow = {
   type: string;
   role: string;
   estimated_hours: number;
-  /** 1-based row numbers this task depends on */
   depends_on_rows: number[];
 };
 
@@ -30,67 +29,139 @@ function toYMD(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Convert "2 weeks", "3–4 weeks", "8–10 weeks" → hours (40h/week). */
+function parseWeeksToHours(estimate: string): number {
+  if (!estimate) return 0;
+  const lower = estimate.toLowerCase().trim();
+  if (lower === 'included' || lower === '') return 0;
+  const rangeMatch = lower.match(/(\d+(?:\.\d+)?)\s*[–\-]\s*(\d+(?:\.\d+)?)\s*weeks?/);
+  if (rangeMatch) {
+    const avg = (parseFloat(rangeMatch[1]) + parseFloat(rangeMatch[2])) / 2;
+    return Math.round(avg * 40);
+  }
+  const single = lower.match(/(\d+(?:\.\d+)?)\s*weeks?/);
+  if (single) return Math.round(parseFloat(single[1]) * 40);
+  // Fallback: bare number = hours
+  const num = parseFloat(lower.replace(/[^0-9.]/g, ''));
+  return isNaN(num) ? 0 : num;
+}
+
 /**
- * Parse Google Sheets CSV export into ImportedRow[].
- * Expected columns (header row detected automatically):
- *   Task / Deliverable | Type | Role | Hours | [Depends On]
- * Section-header rows (no Hours value) become group_label for following rows.
+ * Parse the phase-based decomposition sheet:
+ *   Phase | Module | Key Tasks | Deliverable | Estimate (Commercial)
+ *
+ * Phase numbering rules:
+ *   - Top-level (0, 1, 2, …) with sub-rows (3.1, 4.2…) → group header only
+ *   - Top-level without sub-rows (Discovery, Infra, Testing, Launch) → task
+ *   - Sub-rows (3.1, 4.2…) → tasks under parent group
  */
 export function parseDecompositionCsv(csv: string): ImportedRow[] {
   const lines = csv.split('\n').map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) return [];
 
-  // Detect and skip header row
+  // Skip header row if present
   const firstLower = lines[0].toLowerCase();
-  const startIdx = firstLower.includes('task') || firstLower.includes('deliverable') ? 1 : 0;
+  const startIdx = (firstLower.includes('phase') || firstLower.includes('module') ||
+    firstLower.includes('task') || firstLower.includes('deliverable')) ? 1 : 0;
 
-  const rows: ImportedRow[] = [];
-  let currentGroup = '';
-  let position = 0;
+  type RawRow = { phase: string; module: string; tasks: string; deliverable: string; estimate: string };
+  const rawRows: RawRow[] = [];
 
   for (let i = startIdx; i < lines.length; i++) {
     const cols = splitCsvLine(lines[i]);
-    if (cols.length < 2) continue;
-
-    const title = cols[0]?.trim() ?? '';
-    const type  = cols[1]?.trim() ?? '';
-    const role  = cols[2]?.trim() ?? '';
-    const hoursRaw = cols[3]?.trim() ?? '';
-    const depRaw   = cols[4]?.trim() ?? '';
-
-    if (!title) continue;
-
-    const hours = parseFloat(hoursRaw.replace(/[^0-9.]/g, ''));
-
-    // Rows without a valid hours value are section headers
-    if (!hoursRaw || isNaN(hours)) {
-      currentGroup = title;
-      continue;
-    }
-
-    const depends_on_rows = depRaw
-      ? depRaw.split(/[;,]/).map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n))
-      : [];
-
-    rows.push({
-      position: position++,
-      group_label: currentGroup,
-      title,
-      type,
-      role,
-      estimated_hours: hours,
-      depends_on_rows,
+    const phase = cols[0]?.trim() ?? '';
+    if (!phase) continue;
+    // Skip summary/total rows (e.g. empty phase, or "~26–30 weeks")
+    if (!phase.match(/^[\d.]+$/)) continue;
+    rawRows.push({
+      phase,
+      module: cols[1]?.trim() ?? '',
+      tasks: cols[2]?.trim() ?? '',
+      deliverable: cols[3]?.trim() ?? '',
+      estimate: cols[4]?.trim() ?? '',
     });
   }
 
-  return rows;
+  // Find which top-level phases have children
+  const topWithChildren = new Set<string>();
+  for (const r of rawRows) {
+    if (r.phase.includes('.')) {
+      topWithChildren.add(r.phase.split('.')[0]);
+    }
+  }
+
+  // Collect parent estimates and child counts for hour distribution
+  const parentHours = new Map<string, number>();
+  const parentChildCount = new Map<string, number>();
+  for (const r of rawRows) {
+    if (!r.phase.includes('.') && topWithChildren.has(r.phase)) {
+      parentHours.set(r.phase, parseWeeksToHours(r.estimate));
+    }
+    if (r.phase.includes('.')) {
+      const parent = r.phase.split('.')[0];
+      parentChildCount.set(parent, (parentChildCount.get(parent) ?? 0) + 1);
+    }
+  }
+
+  const result: ImportedRow[] = [];
+  const groupLabels = new Map<string, string>(); // phase number → group label
+  let position = 0;
+
+  // First pass: build group labels for top-level phases with children
+  for (const r of rawRows) {
+    if (!r.phase.includes('.') && topWithChildren.has(r.phase)) {
+      groupLabels.set(r.phase, `Phase ${r.phase}: ${r.module}`);
+    }
+  }
+
+  // Second pass: emit tasks
+  for (const r of rawRows) {
+    const isSubPhase = r.phase.includes('.');
+    const parentPhase = isSubPhase ? r.phase.split('.')[0] : null;
+
+    if (!isSubPhase && topWithChildren.has(r.phase)) {
+      // Group header — no task emitted
+      continue;
+    }
+
+    let hours: number;
+    if (isSubPhase) {
+      // Distribute parent estimate evenly across children
+      const ph = parentHours.get(parentPhase!) ?? 0;
+      const cc = parentChildCount.get(parentPhase!) ?? 1;
+      hours = Math.round(ph / cc);
+    } else {
+      hours = parseWeeksToHours(r.estimate);
+    }
+    if (hours === 0) hours = 8; // minimum 1 day
+
+    const group = isSubPhase
+      ? (groupLabels.get(parentPhase!) ?? '')
+      : '';
+
+    // title: sub-task uses Key Tasks column, standalone uses Module
+    const title = isSubPhase
+      ? (r.tasks || r.module)
+      : (r.module);
+
+    result.push({
+      position: position++,
+      group_label: group,
+      title,
+      type: r.module,
+      role: '',
+      estimated_hours: hours,
+      depends_on_rows: [],
+    });
+  }
+
+  return result;
 }
 
 /**
- * Assign start_date / due_date to each task based on:
- * - project start date
+ * Assign start_date / due_date to each task:
  * - 8 working hours per day
- * - depends_on_rows: task starts after the latest end of its dependencies
+ * - depends_on_rows: starts after latest dependency ends
  */
 export function scheduleTask(rows: ImportedRow[], projectStart: Date): ScheduledTask[] {
   const endDates: Date[] = new Array(rows.length);
@@ -102,17 +173,15 @@ export function scheduleTask(rows: ImportedRow[], projectStart: Date): Scheduled
 
     let start = new Date(projectStart);
 
-    // Start after latest dependency end
     for (const depRow of row.depends_on_rows) {
-      const depIdx = depRow - 1; // depends_on_rows is 1-based
+      const depIdx = depRow - 1;
       if (depIdx >= 0 && depIdx < i && endDates[depIdx]) {
         const depEnd = new Date(endDates[depIdx]);
-        depEnd.setDate(depEnd.getDate() + 1); // next day after dep ends
+        depEnd.setDate(depEnd.getDate() + 1);
         if (depEnd > start) start = depEnd;
       }
     }
 
-    // Skip if start falls on weekend
     while (start.getDay() === 0 || start.getDay() === 6) {
       start.setDate(start.getDate() + 1);
     }
@@ -125,7 +194,7 @@ export function scheduleTask(rows: ImportedRow[], projectStart: Date): Scheduled
   return rows.map((row, i) => ({
     ...row,
     start_date: toYMD(startDates[i]),
-    due_date:   toYMD(endDates[i]),
+    due_date: toYMD(endDates[i]),
   }));
 }
 

@@ -7,29 +7,16 @@ import Container from '@mui/material/Container';
 
 export default async function AdminProjectsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user || user.user_metadata?.role !== 'admin') redirect('/');
 
-  // Fetch all top-level folders (projects)
+  const adminClient = await createAdminClient();
+
   const { data: folders } = await supabase
     .from('folders')
     .select('*')
     .is('parent_id', null)
     .order('position', { ascending: true });
-
-  // Fetch all users for member assignment
-  const adminClient = await createAdminClient();
-  const {
-    data: { users },
-  } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
-
-  // Fetch all project memberships
-  const { data: memberships } = await adminClient
-    .from('project_members')
-    .select('*');
 
   const { data: companies } = await adminClient
     .from('companies')
@@ -50,26 +37,12 @@ export default async function AdminProjectsPage() {
     company_id: (f as Record<string, unknown>).company_id as string | null ?? null,
   }));
 
-  const allUsers = users.map((u) => ({
-    id: u.id,
-    email: u.email ?? '',
-    role: (u.user_metadata?.role as string) ?? 'viewer',
-  }));
-
-  const membershipData = (memberships ?? []).map((m) => ({
-    id: m.id,
-    folder_id: m.folder_id,
-    user_id: m.user_id,
-  }));
-
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Navbar isAdmin userId={user.id} />
       <Container maxWidth="lg" sx={{ py: 5 }}>
         <AdminProjectsClient
           initialProjects={projects}
-          allUsers={allUsers}
-          initialMemberships={membershipData}
           companies={companies ?? []}
         />
       </Container>

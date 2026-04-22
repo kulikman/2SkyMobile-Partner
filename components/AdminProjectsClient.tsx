@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -9,19 +8,16 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
-import Slider from '@mui/material/Slider';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
+import FolderOffIcon from '@mui/icons-material/FolderOff';
 
 type Project = {
   id: string;
@@ -42,18 +38,6 @@ type Company = {
   name: string;
 };
 
-type UserInfo = {
-  id: string;
-  email: string;
-  role: string;
-};
-
-type Membership = {
-  id: string;
-  folder_id: string;
-  user_id: string;
-};
-
 const statusLabels: Record<string, string> = {
   in_progress: 'In progress',
   in_discussion: 'In discussion',
@@ -70,17 +54,12 @@ const statusColors: Record<string, 'success' | 'warning' | 'info' | 'default'> =
 
 export function AdminProjectsClient({
   initialProjects,
-  allUsers,
-  initialMemberships,
   companies,
 }: {
   initialProjects: Project[];
-  allUsers: UserInfo[];
-  initialMemberships: Membership[];
   companies: Company[];
 }) {
   const [projects, setProjects] = useState(initialProjects);
-  const [memberships, setMemberships] = useState(initialMemberships);
 
   // Create dialog
   const [createOpen, setCreateOpen] = useState(false);
@@ -92,29 +71,19 @@ export function AdminProjectsClient({
   // Edit dialog
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [editName, setEditName] = useState('');
-  const [editClientName, setEditClientName] = useState('');
   const [editStatus, setEditStatus] = useState('');
-  const [editProgress, setEditProgress] = useState(0);
   const [editStartedAt, setEditStartedAt] = useState('');
   const [editDeadlineAt, setEditDeadlineAt] = useState('');
   const [editCompanyId, setEditCompanyId] = useState<string>('');
-  const [editStageUrl, setEditStageUrl] = useState('');
   const [saving, setSaving] = useState(false);
-
-  // Member dialog
-  const [memberProject, setMemberProject] = useState<Project | null>(null);
-  const [selectedUser, setSelectedUser] = useState<UserInfo | null>(null);
 
   function openEdit(p: Project) {
     setEditProject(p);
     setEditName(p.name);
-    setEditClientName(p.client_name ?? '');
     setEditStatus(p.status);
-    setEditProgress(p.progress);
     setEditStartedAt(p.started_at?.split('T')[0] ?? '');
     setEditDeadlineAt(p.deadline_at?.split('T')[0] ?? '');
     setEditCompanyId(p.company_id ?? '');
-    setEditStageUrl((p as Record<string, unknown>).stage_url as string ?? '');
   }
 
   async function createProject() {
@@ -162,13 +131,11 @@ export function AdminProjectsClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: editName.trim(),
-        client_name: editClientName.trim() || null,
+        client_name: companies.find((c) => c.id === editCompanyId)?.name ?? null,
         status: editStatus,
-        progress: editProgress,
         started_at: editStartedAt || null,
         deadline_at: editDeadlineAt || null,
         company_id: editCompanyId || null,
-        stage_url: editStageUrl.trim() || null,
       }),
     });
     if (res.ok) {
@@ -181,7 +148,6 @@ export function AdminProjectsClient({
                 name: data.name,
                 client_name: data.client_name ?? null,
                 status: data.status ?? p.status,
-                progress: data.progress ?? p.progress,
                 started_at: data.started_at ?? null,
                 deadline_at: data.deadline_at ?? null,
                 company_id: data.company_id ?? null,
@@ -201,131 +167,64 @@ export function AdminProjectsClient({
     }
   }
 
-  async function addMember(projectId: string, userId: string) {
-    const res = await fetch(`/api/projects/${projectId}/members`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setMemberships((prev) => [...prev, { id: data.id, folder_id: data.folder_id, user_id: data.user_id }]);
-      setSelectedUser(null);
+  // Group projects by company
+  const grouped: { company: Company | null; projects: Project[] }[] = [];
+  for (const company of companies) {
+    const companyProjects = projects.filter((p) => p.company_id === company.id);
+    if (companyProjects.length > 0) {
+      grouped.push({ company, projects: companyProjects });
     }
   }
-
-  async function removeMember(projectId: string, userId: string) {
-    const res = await fetch(`/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' });
-    if (res.ok) {
-      setMemberships((prev) => prev.filter((m) => !(m.folder_id === projectId && m.user_id === userId)));
-    }
-  }
-
-  function getProjectMembers(projectId: string) {
-    return memberships
-      .filter((m) => m.folder_id === projectId)
-      .map((m) => allUsers.find((u) => u.id === m.user_id))
-      .filter(Boolean) as UserInfo[];
-  }
-
-  function getAvailableUsers(projectId: string) {
-    const memberIds = new Set(memberships.filter((m) => m.folder_id === projectId).map((m) => m.user_id));
-    return allUsers.filter((u) => !memberIds.has(u.id));
-  }
+  const unassigned = projects.filter((p) => !p.company_id);
 
   return (
     <Stack spacing={4}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <div>
-          <Typography variant="h5" fontWeight={700}>
-            Manage projects
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {projects.length} projects
-          </Typography>
+          <Typography variant="h5" fontWeight={700}>Projects</Typography>
+          <Typography variant="body2" color="text.secondary">{projects.length} total</Typography>
         </div>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
           New project
         </Button>
       </Stack>
 
-      {projects.map((p) => {
-        const members = getProjectMembers(p.id);
-        return (
-          <Paper key={p.id} variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-              sx={{ px: 3, py: 2 }}
-              flexWrap="wrap"
-              useFlexGap
-              gap={1}
-            >
-              <Box>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Typography variant="subtitle1" fontWeight={700}>
-                    {p.name}
-                  </Typography>
-                  <Chip
-                    label={statusLabels[p.status] ?? p.status}
-                    size="small"
-                    color={statusColors[p.status] ?? 'default'}
-                    variant="outlined"
-                  />
-                  {p.status === 'in_progress' && (
-                    <Chip label={`${p.progress}%`} size="small" variant="outlined" />
-                  )}
-                </Stack>
-                <Stack direction="row" spacing={1.5} mt={0.5} flexWrap="wrap" useFlexGap>
-                  {p.client_name && (
-                    <Typography variant="caption" color="text.secondary">
-                      Client: {p.client_name}
-                    </Typography>
-                  )}
-                  {p.company_id && (
-                    <Typography variant="caption" color="primary.main">
-                      {companies.find((c) => c.id === p.company_id)?.name ?? ''}
-                    </Typography>
-                  )}
-                </Stack>
-              </Box>
-              <Stack direction="row" spacing={0.5}>
-                <IconButton size="small" onClick={() => setMemberProject(p)} title="Members">
-                  <PersonAddIcon fontSize="small" />
-                </IconButton>
-                <IconButton size="small" onClick={() => openEdit(p)} title="Edit">
-                  <EditIcon fontSize="small" />
-                </IconButton>
-                <IconButton size="small" color="error" onClick={() => deleteProject(p.id)} title="Delete">
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Stack>
-            </Stack>
+      {grouped.map(({ company, projects: cProjects }) => (
+        <Box key={company!.id}>
+          <Stack direction="row" spacing={1} alignItems="center" mb={1.5}>
+            <Typography variant="subtitle1" fontWeight={700} color="primary">
+              {company!.name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {cProjects.length} project{cProjects.length !== 1 ? 's' : ''}
+            </Typography>
+          </Stack>
+          <Stack spacing={1.5}>
+            {cProjects.map((p) => <ProjectRow key={p.id} p={p} onEdit={openEdit} onDelete={deleteProject} />)}
+          </Stack>
+        </Box>
+      ))}
 
-            {members.length > 0 && (
-              <>
-                <Divider />
-                <Box sx={{ px: 3, py: 1.5 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                    Members:
-                  </Typography>
-                  <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                    {members.map((u) => (
-                      <Chip
-                        key={u.id}
-                        label={u.email}
-                        size="small"
-                        onDelete={() => removeMember(p.id, u.id)}
-                      />
-                    ))}
-                  </Stack>
-                </Box>
-              </>
-            )}
-          </Paper>
-        );
-      })}
+      {unassigned.length > 0 && (
+        <Box>
+          <Stack direction="row" spacing={1} alignItems="center" mb={1.5}>
+            <FolderOffIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+            <Typography variant="subtitle1" fontWeight={700} color="text.secondary">No company</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {unassigned.length} project{unassigned.length !== 1 ? 's' : ''}
+            </Typography>
+          </Stack>
+          <Stack spacing={1.5}>
+            {unassigned.map((p) => <ProjectRow key={p.id} p={p} onEdit={openEdit} onDelete={deleteProject} />)}
+          </Stack>
+        </Box>
+      )}
+
+      {projects.length === 0 && (
+        <Paper variant="outlined" sx={{ p: 6, textAlign: 'center', borderRadius: 3 }}>
+          <Typography color="text.secondary">No projects yet. Create one to get started.</Typography>
+        </Paper>
+      )}
 
       {/* Create Project Dialog */}
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
@@ -374,7 +273,7 @@ export function AdminProjectsClient({
 
       {/* Edit Project Dialog */}
       <Dialog open={Boolean(editProject)} onClose={() => setEditProject(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit project</DialogTitle>
+        <DialogTitle fontWeight={700}>Edit project</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
@@ -384,11 +283,17 @@ export function AdminProjectsClient({
               fullWidth
             />
             <TextField
-              label="Client name"
-              value={editClientName}
-              onChange={(e) => setEditClientName(e.target.value)}
+              label="Company"
+              select
+              value={editCompanyId}
+              onChange={(e) => setEditCompanyId(e.target.value)}
               fullWidth
-            />
+            >
+              <MenuItem value="">— No company —</MenuItem>
+              {companies.map((c) => (
+                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+              ))}
+            </TextField>
             <TextField
               label="Status"
               select
@@ -401,18 +306,6 @@ export function AdminProjectsClient({
               <MenuItem value="completed">Completed</MenuItem>
               <MenuItem value="archived">Archived</MenuItem>
             </TextField>
-            <Box>
-              <Typography variant="body2" gutterBottom>
-                Progress: {editProgress}%
-              </Typography>
-              <Slider
-                value={editProgress}
-                onChange={(_, v) => setEditProgress(v as number)}
-                min={0}
-                max={100}
-                step={5}
-              />
-            </Box>
             <Stack direction="row" spacing={2}>
               <TextField
                 label="Start date"
@@ -431,25 +324,6 @@ export function AdminProjectsClient({
                 fullWidth
               />
             </Stack>
-            <TextField
-              label="Stage URL"
-              placeholder="https://staging.example.com"
-              value={editStageUrl}
-              onChange={(e) => setEditStageUrl(e.target.value)}
-              fullWidth
-            />
-            <TextField
-              label="Company"
-              select
-              value={editCompanyId}
-              onChange={(e) => setEditCompanyId(e.target.value)}
-              fullWidth
-            >
-              <MenuItem value="">— No company —</MenuItem>
-              {companies.map((c) => (
-                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
-              ))}
-            </TextField>
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -459,60 +333,72 @@ export function AdminProjectsClient({
           </Button>
         </DialogActions>
       </Dialog>
+    </Stack>
+  );
+}
 
-      {/* Member Management Dialog */}
-      <Dialog open={Boolean(memberProject)} onClose={() => setMemberProject(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Members: {memberProject?.name}
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Autocomplete
-              options={memberProject ? getAvailableUsers(memberProject.id) : []}
-              getOptionLabel={(u) => u.email}
-              value={selectedUser}
-              onChange={(_, v) => setSelectedUser(v)}
-              renderInput={(params) => <TextField {...params} label="Add user" size="small" />}
-            />
-            <Button
-              variant="contained"
+function ProjectRow({
+  p,
+  onEdit,
+  onDelete,
+}: {
+  p: Project;
+  onEdit: (p: Project) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  return (
+    <>
+      <Paper variant="outlined" sx={{ borderRadius: 2 }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{ px: 2.5, py: 1.5 }}
+          flexWrap="wrap"
+          useFlexGap
+          gap={1}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Typography variant="body1" fontWeight={600}>{p.name}</Typography>
+            <Chip
+              label={statusLabels[p.status] ?? p.status}
               size="small"
-              startIcon={<PersonAddIcon />}
-              disabled={!selectedUser || !memberProject}
-              onClick={() => {
-                if (selectedUser && memberProject) addMember(memberProject.id, selectedUser.id);
-              }}
-            >
-              Add
-            </Button>
-
-            <Divider />
-
-            <Typography variant="subtitle2">Current members:</Typography>
-            {memberProject && getProjectMembers(memberProject.id).length === 0 && (
-              <Typography variant="body2" color="text.secondary">
-                No members
+              color={statusColors[p.status] ?? 'default'}
+              variant="outlined"
+            />
+          </Stack>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            {p.deadline_at && (
+              <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+                Due {new Date(p.deadline_at).toLocaleDateString()}
               </Typography>
             )}
-            {memberProject &&
-              getProjectMembers(memberProject.id).map((u) => (
-                <Stack key={u.id} direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="body2">{u.email}</Typography>
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => removeMember(memberProject.id, u.id)}
-                  >
-                    <PersonRemoveIcon fontSize="small" />
-                  </IconButton>
-                </Stack>
-              ))}
+            <IconButton size="small" onClick={() => onEdit(p)} title="Edit">
+              <EditIcon fontSize="small" />
+            </IconButton>
+            <IconButton size="small" color="error" onClick={() => setConfirmDelete(true)} title="Delete">
+              <DeleteIcon fontSize="small" />
+            </IconButton>
           </Stack>
+        </Stack>
+      </Paper>
+
+      <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)} maxWidth="xs" fullWidth>
+        <DialogTitle fontWeight={700}>Delete project?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            <strong>{p.name}</strong> will be permanently deleted.
+          </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setMemberProject(null)}>Close</Button>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setConfirmDelete(false)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={() => { onDelete(p.id); setConfirmDelete(false); }}>
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
-    </Stack>
+    </>
   );
 }

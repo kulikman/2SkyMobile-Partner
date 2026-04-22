@@ -16,6 +16,7 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import Alert from '@mui/material/Alert';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -43,6 +44,7 @@ export function MeetingsView({ folderId, isAdmin }: { folderId: string; isAdmin:
   const [date, setDate] = useState('');
   const [summary, setSummary] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     fetch(`/api/meetings?folderId=${folderId}`)
@@ -70,6 +72,7 @@ export function MeetingsView({ folderId, isAdmin }: { folderId: string; isAdmin:
   async function handleSave() {
     if (!title.trim() || !date) return;
     setSaving(true);
+    setSaveError('');
 
     if (editTarget) {
       const res = await fetch(`/api/meetings/${editTarget.id}`, {
@@ -81,6 +84,9 @@ export function MeetingsView({ folderId, isAdmin }: { folderId: string; isAdmin:
         const updated = await res.json();
         setMeetings((prev) => prev.map((m) => m.id === editTarget.id ? updated : m));
         setDialogOpen(false);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setSaveError(d.error ?? 'Failed to save meeting');
       }
     } else {
       const res = await fetch('/api/meetings', {
@@ -92,6 +98,9 @@ export function MeetingsView({ folderId, isAdmin }: { folderId: string; isAdmin:
         const created = await res.json();
         setMeetings((prev) => [created, ...prev]);
         setDialogOpen(false);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setSaveError(d.error ?? 'Failed to save meeting');
       }
     }
     setSaving(false);
@@ -187,10 +196,11 @@ export function MeetingsView({ folderId, isAdmin }: { folderId: string; isAdmin:
         </Stack>
       )}
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={dialogOpen} onClose={() => { setDialogOpen(false); setSaveError(''); }} maxWidth="sm" fullWidth>
         <DialogTitle fontWeight={700}>{editTarget ? 'Edit meeting' : 'New meeting'}</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
+            {saveError && <Alert severity="error">{saveError}</Alert>}
             <TextField
               label="Title / Topic"
               value={title}
@@ -218,7 +228,7 @@ export function MeetingsView({ folderId, isAdmin }: { folderId: string; isAdmin:
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={() => { setDialogOpen(false); setSaveError(''); }} disabled={saving}>Cancel</Button>
           <Button
             variant="contained"
             onClick={handleSave}

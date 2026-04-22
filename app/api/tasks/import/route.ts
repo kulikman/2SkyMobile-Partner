@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { parseDecompositionCsv, scheduleTask } from '@/lib/tasks-schedule';
 
 function toExportUrl(sheetUrl: string): string | null {
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
   const rows = parseDecompositionCsv(csv);
   if (rows.length === 0) {
-    return NextResponse.json({ error: 'No tasks found in sheet' }, { status: 400 });
+    return NextResponse.json({ error: 'No tasks found in sheet. Check that the sheet is public and matches the expected column format.' }, { status: 400 });
   }
 
   const startDate = new Date(project_start);
@@ -56,10 +56,11 @@ export async function POST(req: NextRequest) {
 
   const scheduled = scheduleTask(rows, startDate);
 
-  // Delete existing tasks for this folder before re-import
-  await supabase.from('tasks').delete().eq('folder_id', folder_id);
+  // Use admin client to bypass RLS for write operations
+  const adminClient = await createAdminClient();
 
-  // Insert all tasks; resolve depends_on by position index after insert
+  await adminClient.from('tasks').delete().eq('folder_id', folder_id);
+
   const inserts = scheduled.map((t) => ({
     folder_id,
     group_label: t.group_label || null,
@@ -74,27 +75,25 @@ export async function POST(req: NextRequest) {
     depends_on: [],
   }));
 
-  const { data: inserted, error } = await supabase
+  const { data: inserted, error } = await adminClient
     .from('tasks')
     .insert(inserts)
     .select('id, position');
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Build position→id map and back-fill depends_on UUIDs
+  // Back-fill depends_on UUIDs
   const posToId = new Map((inserted ?? []).map((r) => [r.position, r.id]));
   const updates = scheduled
     .filter((t) => t.depends_on_rows.length > 0)
     .map((t) => ({
       id: posToId.get(t.position)!,
-      depends_on: t.depends_on_rows
-        .map((r) => posToId.get(r - 1))
-        .filter(Boolean),
+      depends_on: t.depends_on_rows.map((r) => posToId.get(r - 1)).filter(Boolean),
     }));
 
   await Promise.all(
     updates.map(({ id, depends_on }) =>
-      supabase.from('tasks').update({ depends_on }).eq('id', id)
+      adminClient.from('tasks').update({ depends_on }).eq('id', id)
     )
   );
 

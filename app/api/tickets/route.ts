@@ -3,7 +3,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
   const folderId = req.nextUrl.searchParams.get('folderId');
-  if (!folderId) return NextResponse.json({ error: 'folderId is required' }, { status: 400 });
+  if (!folderId) return NextResponse.json({ error: 'folderId required' }, { status: 400 });
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -11,46 +11,50 @@ export async function GET(req: NextRequest) {
 
   const adminClient = await createAdminClient();
   const { data, error } = await adminClient
-    .from('tasks')
+    .from('tickets')
     .select('*')
     .eq('folder_id', folderId)
-    .order('position', { ascending: true });
+    .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+
+  // Enrich with creator email
+  const { data: { users } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+  const userMap = new Map(users.map((u) => [u.id, u.email ?? '']));
+  const enriched = (data ?? []).map((t) => ({ ...t, created_by_email: userMap.get(t.created_by) ?? '' }));
+
+  return NextResponse.json(enriched);
 }
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.user_metadata?.role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let body: any;
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
-  const { folder_id, group_label, title, type, role, estimated_hours,
-    depends_on, position, start_date, due_date, description } = body;
-
+  const { folder_id, title, description, url, screenshot_path } = body;
   if (!folder_id || !title?.trim()) {
-    return NextResponse.json({ error: 'folder_id and title are required' }, { status: 400 });
+    return NextResponse.json({ error: 'folder_id and title required' }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from('tasks')
+  const adminClient = await createAdminClient();
+  const { data, error } = await adminClient
+    .from('tickets')
     .insert({
-      folder_id, group_label: group_label ?? null, title: title.trim(),
-      description: description ?? null, type: type ?? null, role: role ?? null,
-      estimated_hours: estimated_hours ?? null, depends_on: depends_on ?? [],
-      position: position ?? 0, start_date: start_date ?? null,
-      due_date: due_date ?? null, status: 'backlog',
+      folder_id,
+      title: title.trim(),
+      description: description?.trim() || null,
+      url: url?.trim() || null,
+      screenshot_path: screenshot_path || null,
+      created_by: user.id,
     })
     .select()
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data, { status: 201 });
+  return NextResponse.json({ ...data, created_by_email: user.email ?? '' }, { status: 201 });
 }

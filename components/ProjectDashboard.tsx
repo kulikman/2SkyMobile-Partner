@@ -1,15 +1,24 @@
 'use client';
 
+import { useState } from 'react';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardActionArea from '@mui/material/CardActionArea';
 import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
-import LinearProgress from '@mui/material/LinearProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import AddIcon from '@mui/icons-material/Add';
 import FolderIcon from '@mui/icons-material/Folder';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export type ProjectForDashboard = {
   id: string;
@@ -21,7 +30,10 @@ export type ProjectForDashboard = {
   client_name: string | null;
   started_at: string | null;
   deadline_at: string | null;
+  company_id: string | null;
 };
+
+type Company = { id: string; name: string };
 
 function ProjectCard({ project }: { project: ProjectForDashboard }) {
   const isInProgress = project.status === 'in_progress';
@@ -69,24 +81,6 @@ function ProjectCard({ project }: { project: ProjectForDashboard }) {
             </Box>
           </Stack>
 
-          {isInProgress && (
-            <Box mb={1}>
-              <Stack direction="row" justifyContent="space-between" mb={0.5}>
-                <Typography variant="caption" color="text.secondary">
-                  Progress
-                </Typography>
-                <Typography variant="caption" fontWeight={600}>
-                  {project.progress}%
-                </Typography>
-              </Stack>
-              <LinearProgress
-                variant="determinate"
-                value={project.progress}
-                sx={{ borderRadius: 2, height: 6 }}
-              />
-            </Box>
-          )}
-
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Chip
               label={isInProgress ? 'In progress' : 'In discussion'}
@@ -109,66 +103,140 @@ function ProjectCard({ project }: { project: ProjectForDashboard }) {
 }
 
 export function ProjectDashboard({
-  projects,
+  projects: initialProjects,
   isAdmin,
+  companies = [],
 }: {
   projects: ProjectForDashboard[];
   isAdmin: boolean;
+  companies?: Company[];
 }) {
-  const inProgress = projects.filter((p) => p.status === 'in_progress');
-  const inDiscussion = projects.filter((p) => p.status === 'in_discussion');
+  const router = useRouter();
+  const [projects, setProjects] = useState(initialProjects);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newCompanyId, setNewCompanyId] = useState('');
+  const [newStatus, setNewStatus] = useState('in_discussion');
+  const [creating, setCreating] = useState(false);
+
+  async function createProject() {
+    if (!newName.trim()) return;
+    setCreating(true);
+    const res = await fetch('/api/folders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newName.trim(),
+        status: newStatus,
+        company_id: newCompanyId || null,
+        client_name: companies.find((c) => c.id === newCompanyId)?.name ?? null,
+        position: projects.length,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setProjects((prev) => [...prev, {
+        id: data.id, name: data.name, color: data.color ?? null, icon: data.icon ?? null,
+        status: data.status ?? 'in_discussion', progress: 0,
+        client_name: data.client_name ?? null, started_at: null, deadline_at: null,
+        company_id: data.company_id ?? (newCompanyId || null),
+      }]);
+      setCreateOpen(false);
+      setNewName(''); setNewCompanyId(''); setNewStatus('in_discussion');
+      router.refresh();
+    }
+    setCreating(false);
+  }
+
+  // Group by company: use companies list order, then "no company" at end
+  const grouped: { label: string; logoInitials: string; projects: ProjectForDashboard[] }[] = [];
+
+  if (companies.length > 0) {
+    for (const c of companies) {
+      const cp = projects.filter((p) => p.company_id === c.id);
+      if (cp.length > 0) grouped.push({ label: c.name, logoInitials: c.name.slice(0, 2).toUpperCase(), projects: cp });
+    }
+    const unassigned = projects.filter((p) => !p.company_id);
+    if (unassigned.length > 0) grouped.push({ label: 'No company', logoInitials: '—', projects: unassigned });
+  } else {
+    // Partner view: no companies passed, show all as one group using client_name
+    const byClient: Record<string, ProjectForDashboard[]> = {};
+    for (const p of projects) {
+      const key = p.client_name ?? '';
+      if (!byClient[key]) byClient[key] = [];
+      byClient[key].push(p);
+    }
+    for (const [label, ps] of Object.entries(byClient)) {
+      grouped.push({ label: label || 'Projects', logoInitials: label.slice(0, 2).toUpperCase() || '—', projects: ps });
+    }
+  }
+
+  const gridCols = { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' };
 
   return (
-    <Stack spacing={4}>
-      {inProgress.length > 0 && (
-        <Box>
-          <Typography variant="h5" fontWeight={700} mb={2}>
-            Projects in progress
-          </Typography>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: '1fr',
-                sm: 'repeat(2, 1fr)',
-                md: 'repeat(3, 1fr)',
-              },
-              gap: 2,
-            }}
-          >
-            {inProgress.map((p) => (
-              <ProjectCard key={p.id} project={p} />
-            ))}
-          </Box>
-        </Box>
-      )}
+    <Stack spacing={5}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="body2" color="text.secondary">
+          {projects.length} project{projects.length !== 1 ? 's' : ''}
+        </Typography>
+        {isAdmin && (
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
+            New project
+          </Button>
+        )}
+      </Box>
 
-      {inDiscussion.length > 0 && (
-        <Box>
-          <Typography variant="h5" fontWeight={700} mb={2}>
-            Projects in discussion
-          </Typography>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: '1fr',
-                sm: 'repeat(2, 1fr)',
-                md: 'repeat(3, 1fr)',
-              },
-              gap: 2,
-            }}
-          >
-            {inDiscussion.map((p) => (
-              <ProjectCard key={p.id} project={p} />
-            ))}
+      {/* Create dialog */}
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle fontWeight={700}>New project</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField label="Project name" value={newName} onChange={(e) => setNewName(e.target.value)} fullWidth autoFocus />
+            {companies.length > 0 && (
+              <TextField label="Company" select value={newCompanyId} onChange={(e) => setNewCompanyId(e.target.value)} fullWidth>
+                <MenuItem value="">— No company —</MenuItem>
+                {companies.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+              </TextField>
+            )}
+            <TextField label="Status" select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} fullWidth>
+              <MenuItem value="in_discussion">In discussion</MenuItem>
+              <MenuItem value="in_progress">In progress</MenuItem>
+            </TextField>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
+          <Button variant="contained" disabled={creating || !newName.trim()} onClick={createProject}>
+            {creating ? 'Creating…' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {grouped.map(({ label, logoInitials, projects: gProjects }) => (
+        <Box key={label}>
+          <Stack direction="row" spacing={1.5} alignItems="center" mb={2}>
+            <Box sx={{
+              width: 32, height: 32, borderRadius: 1.5, bgcolor: 'primary.main',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <Typography variant="caption" color="white" fontWeight={700} fontSize={11}>
+                {logoInitials}
+              </Typography>
+            </Box>
+            <Typography variant="h6" fontWeight={700}>{label}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {gProjects.length} project{gProjects.length !== 1 ? 's' : ''}
+            </Typography>
+          </Stack>
+          <Box sx={{ display: 'grid', gridTemplateColumns: gridCols, gap: 2 }}>
+            {gProjects.map((p) => <ProjectCard key={p.id} project={p} />)}
           </Box>
         </Box>
-      )}
+      ))}
 
       {projects.length === 0 && (
         <Typography variant="body1" color="text.secondary" textAlign="center" py={8}>
-          {isAdmin ? 'No projects yet. Create your first project in the admin panel.' : 'No projects available.'}
+          No projects available.
         </Typography>
       )}
     </Stack>

@@ -1,12 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Box from "@mui/material/Box";
 import Container from "@mui/material/Container";
 import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import Stack from "@mui/material/Stack";
-import AddIcon from "@mui/icons-material/Add";
-import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { ProjectDashboard } from "@/components/ProjectDashboard";
 import type { ProjectForDashboard } from "@/components/ProjectDashboard";
@@ -39,26 +35,25 @@ export default async function HomePage() {
     client_name: f.client_name ?? null,
     started_at: f.started_at ?? null,
     deadline_at: f.deadline_at ?? null,
+    company_id: f.company_id ?? null,
   }));
+
+  let companies: { id: string; name: string }[] = [];
+  if (isAdmin) {
+    const adminClient = await createAdminClient();
+    const { data: companiesData } = await adminClient.from("companies").select("id, name").order("name");
+    companies = companiesData ?? [];
+  }
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
       <Navbar isAdmin={isAdmin} userId={user.id} />
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
-          <Typography variant="h4" fontWeight={800}>
-            Projects
-          </Typography>
-          {isAdmin && (
-            <Link href="/admin/projects" style={{ textDecoration: "none" }}>
-              <Button variant="contained" size="small" startIcon={<AddIcon />}>
-                Manage projects
-              </Button>
-            </Link>
-          )}
-        </Stack>
+        <Typography variant="h4" fontWeight={800} mb={3}>
+          Projects
+        </Typography>
 
-        <ProjectDashboard projects={projects} isAdmin={isAdmin} />
+        <ProjectDashboard projects={projects} isAdmin={isAdmin} companies={companies} />
       </Container>
     </Box>
   );

@@ -17,24 +17,33 @@ export default async function AdminCompaniesPage() {
     .select('*')
     .order('created_at', { ascending: false });
 
-  // Enrich with user emails (one user per company via company_id in user_metadata)
   const { data: { users } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
-  const companyUserMap = new Map<string, string>();
-  for (const u of users) {
-    const cid = u.user_metadata?.company_id;
-    if (cid) companyUserMap.set(cid, u.email ?? '');
-  }
 
-  const enriched = (companies ?? []).map((c) => ({
-    ...c,
-    user_email: companyUserMap.get(c.id) ?? null,
+  const allUsers = users.map((u) => ({
+    id: u.id,
+    email: u.email ?? '',
+    role: (u.user_metadata?.role as string) ?? 'viewer',
+  }));
+
+  const { data: rawMemberships } = await adminClient
+    .from('company_members')
+    .select('id, company_id, user_id');
+
+  const memberships = (rawMemberships ?? []).map((m) => ({
+    id: m.id as string,
+    company_id: m.company_id as string,
+    user_id: m.user_id as string,
   }));
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Navbar isAdmin userId={user.id} />
       <Container maxWidth="md" sx={{ py: 5 }}>
-        <AdminCompaniesClient initialCompanies={enriched} />
+        <AdminCompaniesClient
+          initialCompanies={companies ?? []}
+          allUsers={allUsers}
+          initialMemberships={memberships}
+        />
       </Container>
     </Box>
   );
