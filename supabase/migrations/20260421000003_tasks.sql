@@ -24,6 +24,7 @@ CREATE INDEX tasks_status_idx    ON tasks(status);
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 
 -- Admin full access
+DROP POLICY IF EXISTS "Admin full access on tasks" ON tasks;
 CREATE POLICY "Admin full access on tasks"
   ON tasks FOR ALL
   USING (
@@ -35,6 +36,7 @@ CREATE POLICY "Admin full access on tasks"
   );
 
 -- Partners can read tasks for projects belonging to their company
+DROP POLICY IF EXISTS "Partners can read tasks for their projects" ON tasks;
 CREATE POLICY "Partners can read tasks for their projects"
   ON tasks FOR SELECT
   USING (
@@ -49,6 +51,7 @@ CREATE POLICY "Partners can read tasks for their projects"
   );
 
 -- Partners can update status + add description comment (for testing feedback)
+DROP POLICY IF EXISTS "Partners can update task status" ON tasks;
 CREATE POLICY "Partners can update task status"
   ON tasks FOR UPDATE
   USING (

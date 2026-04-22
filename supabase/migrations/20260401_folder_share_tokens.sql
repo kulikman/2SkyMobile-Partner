@@ -1,3 +1,5 @@
+SET search_path TO "$user", public, extensions;
+
 alter table public.folders
   add column if not exists public_share_token text;
 

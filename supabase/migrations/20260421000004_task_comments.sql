@@ -15,6 +15,7 @@ CREATE INDEX task_comments_parent_id_idx ON task_comments(parent_id);
 ALTER TABLE task_comments ENABLE ROW LEVEL SECURITY;
 
 -- Admin full access
+DROP POLICY IF EXISTS "Admin full access on task_comments" ON task_comments;
 CREATE POLICY "Admin full access on task_comments"
   ON task_comments FOR ALL
   USING (
@@ -26,6 +27,7 @@ CREATE POLICY "Admin full access on task_comments"
   );
 
 -- Partners can read comments for tasks in their projects
+DROP POLICY IF EXISTS "Partners can read task comments for their projects" ON task_comments;
 CREATE POLICY "Partners can read task comments for their projects"
   ON task_comments FOR SELECT
   USING (
@@ -41,6 +43,7 @@ CREATE POLICY "Partners can read task comments for their projects"
   );
 
 -- Partners can insert comments for tasks in their projects
+DROP POLICY IF EXISTS "Partners can create task comments" ON task_comments;
 CREATE POLICY "Partners can create task comments"
   ON task_comments FOR INSERT
   WITH CHECK (
@@ -57,6 +60,7 @@ CREATE POLICY "Partners can create task comments"
   );
 
 -- Users can delete own comments; admin deletes any
+DROP POLICY IF EXISTS "Users can delete own task comments" ON task_comments;
 CREATE POLICY "Users can delete own task comments"
   ON task_comments FOR DELETE
   USING (

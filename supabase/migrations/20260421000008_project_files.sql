@@ -13,6 +13,7 @@ CREATE INDEX project_files_folder_id_idx ON project_files(folder_id);
 
 ALTER TABLE project_files ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admin full access on project_files" ON project_files;
 CREATE POLICY "Admin full access on project_files"
   ON project_files FOR ALL
   USING (EXISTS (
@@ -21,6 +22,7 @@ CREATE POLICY "Admin full access on project_files"
       AND auth.users.raw_user_meta_data->>'role' = 'admin'
   ));
 
+DROP POLICY IF EXISTS "Partners can read files for their projects" ON project_files;
 CREATE POLICY "Partners can read files for their projects"
   ON project_files FOR SELECT
   USING (EXISTS (

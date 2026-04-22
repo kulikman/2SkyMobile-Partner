@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 
 -- Members can read chat messages for their projects
+DROP POLICY IF EXISTS "Members can read chat_messages" ON chat_messages;
 CREATE POLICY "Members can read chat_messages"
   ON chat_messages FOR SELECT
   TO authenticated
@@ -23,6 +24,7 @@ CREATE POLICY "Members can read chat_messages"
   );
 
 -- Members can insert chat messages in their projects
+DROP POLICY IF EXISTS "Members can insert chat_messages" ON chat_messages;
 CREATE POLICY "Members can insert chat_messages"
   ON chat_messages FOR INSERT
   TO authenticated
@@ -38,6 +40,7 @@ CREATE POLICY "Members can insert chat_messages"
   );
 
 -- Admin can manage all chat messages
+DROP POLICY IF EXISTS "Admin can manage chat_messages" ON chat_messages;
 CREATE POLICY "Admin can manage chat_messages"
   ON chat_messages FOR ALL
   TO authenticated

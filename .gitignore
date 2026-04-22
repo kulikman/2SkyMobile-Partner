@@ -21,6 +21,7 @@
 # local tooling
 .claude/
 supabase/.temp/
+supabase/**/.temp/
 
 # misc
 .DS_Store

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS project_members (
 ALTER TABLE project_members ENABLE ROW LEVEL SECURITY;
 
 -- Users can see their own memberships
+DROP POLICY IF EXISTS "Users can see own memberships" ON project_members;
 CREATE POLICY "Users can see own memberships"
   ON project_members FOR SELECT
   TO authenticated
@@ -19,6 +20,7 @@ CREATE POLICY "Users can see own memberships"
   );
 
 -- Only admin can manage memberships
+DROP POLICY IF EXISTS "Admin can manage project_members" ON project_members;
 CREATE POLICY "Admin can manage project_members"
   ON project_members FOR ALL
   TO authenticated
@@ -28,6 +30,7 @@ CREATE POLICY "Admin can manage project_members"
 -- Update folders RLS: viewers see only projects they're members of
 DROP POLICY IF EXISTS "Authenticated users can read folders" ON folders;
 
+DROP POLICY IF EXISTS "Users can read assigned folders" ON folders;
 CREATE POLICY "Users can read assigned folders"
   ON folders FOR SELECT
   TO authenticated

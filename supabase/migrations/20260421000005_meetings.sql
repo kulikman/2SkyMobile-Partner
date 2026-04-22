@@ -11,6 +11,7 @@ CREATE INDEX meetings_folder_id_idx ON meetings(folder_id);
 
 ALTER TABLE meetings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admin full access on meetings" ON meetings;
 CREATE POLICY "Admin full access on meetings"
   ON meetings FOR ALL
   USING (EXISTS (
@@ -19,6 +20,7 @@ CREATE POLICY "Admin full access on meetings"
       AND auth.users.raw_user_meta_data->>'role' = 'admin'
   ));
 
+DROP POLICY IF EXISTS "Partners can read meetings for their projects" ON meetings;
 CREATE POLICY "Partners can read meetings for their projects"
   ON meetings FOR SELECT
   USING (EXISTS (

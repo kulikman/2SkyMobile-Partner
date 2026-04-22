@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS tickets (
 ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
 
 -- Admins see and manage all tickets
+DROP POLICY IF EXISTS "tickets_admin" ON tickets;
 CREATE POLICY "tickets_admin"
   ON tickets FOR ALL
   TO authenticated
@@ -23,6 +24,7 @@ CREATE POLICY "tickets_admin"
   WITH CHECK ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
 
 -- Partners can read tickets for their company's projects
+DROP POLICY IF EXISTS "tickets_partner_select" ON tickets;
 CREATE POLICY "tickets_partner_select"
   ON tickets FOR SELECT
   TO authenticated
@@ -35,6 +37,7 @@ CREATE POLICY "tickets_partner_select"
   );
 
 -- Partners can create tickets for their company's projects
+DROP POLICY IF EXISTS "tickets_partner_insert" ON tickets;
 CREATE POLICY "tickets_partner_insert"
   ON tickets FOR INSERT
   TO authenticated
@@ -48,6 +51,7 @@ CREATE POLICY "tickets_partner_insert"
   );
 
 -- Partners can update only their own tickets (to approve)
+DROP POLICY IF EXISTS "tickets_partner_update" ON tickets;
 CREATE POLICY "tickets_partner_update"
   ON tickets FOR UPDATE
   TO authenticated

@@ -16,6 +16,7 @@ ALTER TABLE folders ADD COLUMN tech_spec jsonb;
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 
 -- Admin can do anything
+DROP POLICY IF EXISTS "Admin full access on companies" ON companies;
 CREATE POLICY "Admin full access on companies"
   ON companies FOR ALL
   USING (
@@ -27,6 +28,7 @@ CREATE POLICY "Admin full access on companies"
   );
 
 -- Partners can read their own company
+DROP POLICY IF EXISTS "Partners can read own company" ON companies;
 CREATE POLICY "Partners can read own company"
   ON companies FOR SELECT
   USING (

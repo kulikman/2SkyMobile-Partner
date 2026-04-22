@@ -26,9 +26,11 @@ FROM ordered WHERE documents.id = ordered.id;
 -- RLS for folders
 ALTER TABLE folders ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can read folders" ON folders;
 CREATE POLICY "Authenticated users can read folders"
   ON folders FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Admin can manage folders" ON folders;
 CREATE POLICY "Admin can manage folders"
   ON folders FOR ALL TO authenticated
   USING  ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin')

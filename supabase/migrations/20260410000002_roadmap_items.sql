@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS roadmap_items (
 ALTER TABLE roadmap_items ENABLE ROW LEVEL SECURITY;
 
 -- Users can read roadmap items for projects they're members of
+DROP POLICY IF EXISTS "Members can read roadmap_items" ON roadmap_items;
 CREATE POLICY "Members can read roadmap_items"
   ON roadmap_items FOR SELECT
   TO authenticated
@@ -26,6 +27,7 @@ CREATE POLICY "Members can read roadmap_items"
   );
 
 -- Only admin can manage roadmap items
+DROP POLICY IF EXISTS "Admin can manage roadmap_items" ON roadmap_items;
 CREATE POLICY "Admin can manage roadmap_items"
   ON roadmap_items FOR ALL
   TO authenticated

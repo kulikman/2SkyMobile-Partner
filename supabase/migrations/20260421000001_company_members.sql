@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS company_members (
 ALTER TABLE company_members ENABLE ROW LEVEL SECURITY;
 
 -- Users can see their own memberships; admins see all
+DROP POLICY IF EXISTS "company_members_select" ON company_members;
 CREATE POLICY "company_members_select"
   ON company_members FOR SELECT
   TO authenticated
@@ -19,6 +20,7 @@ CREATE POLICY "company_members_select"
   );
 
 -- Only admins can manage memberships
+DROP POLICY IF EXISTS "company_members_admin" ON company_members;
 CREATE POLICY "company_members_admin"
   ON company_members FOR ALL
   TO authenticated
@@ -28,6 +30,7 @@ CREATE POLICY "company_members_admin"
 -- Update folders RLS: viewers see projects belonging to their company
 DROP POLICY IF EXISTS "Users can read assigned folders" ON folders;
 
+DROP POLICY IF EXISTS "Users can read assigned folders" ON folders;
 CREATE POLICY "Users can read assigned folders"
   ON folders FOR SELECT
   TO authenticated
