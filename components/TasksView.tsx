@@ -7,6 +7,10 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
@@ -26,9 +30,12 @@ import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import AddIcon from '@mui/icons-material/Add';
 import ChatBubbleIcon from '@mui/icons-material/ChatBubble';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import CloseIcon from '@mui/icons-material/Close';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import SendIcon from '@mui/icons-material/Send';
@@ -110,10 +117,12 @@ function StatusChip({ status, onChange }: { status: string; onChange?: (s: strin
   );
 }
 
-function TaskRow({ task, isAdmin, hasComments, onStatusChange, onOpenComments }:
+function TaskRow({ task, isAdmin, hasComments, onStatusChange, onOpenComments, onEdit, onDelete }:
   { task: Task; isAdmin: boolean; hasComments: boolean;
     onStatusChange: (id: string, status: string) => void;
-    onOpenComments: (task: Task) => void }) {
+    onOpenComments: (task: Task) => void;
+    onEdit: (task: Task) => void;
+    onDelete: (id: string) => void }) {
 
   const [updating, setUpdating] = useState(false);
 
@@ -165,17 +174,161 @@ function TaskRow({ task, isAdmin, hasComments, onStatusChange, onOpenComments }:
           />
         )}
       </TableCell>
-      <TableCell align="center">
-        <Tooltip title="Comments">
-          <IconButton size="small" onClick={() => onOpenComments(task)}
-            sx={{ color: hasComments ? 'primary.main' : 'text.disabled' }}>
-            {hasComments
-              ? <ChatBubbleIcon sx={{ fontSize: 16 }} />
-              : <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />}
-          </IconButton>
-        </Tooltip>
+      <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+        <Stack direction="row" spacing={0} alignItems="center" justifyContent="center">
+          {isAdmin && (
+            <Tooltip title="Edit">
+              <IconButton size="small" onClick={() => onEdit(task)} sx={{ color: 'text.disabled' }}>
+                <EditIcon sx={{ fontSize: 15 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          {isAdmin && (
+            <Tooltip title="Delete">
+              <IconButton size="small" color="error" onClick={() => onDelete(task.id)}>
+                <DeleteIcon sx={{ fontSize: 15 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Tooltip title="Comments">
+            <IconButton size="small" onClick={() => onOpenComments(task)}
+              sx={{ color: hasComments ? 'primary.main' : 'text.disabled' }}>
+              {hasComments
+                ? <ChatBubbleIcon sx={{ fontSize: 16 }} />
+                : <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />}
+            </IconButton>
+          </Tooltip>
+        </Stack>
       </TableCell>
     </TableRow>
+  );
+}
+
+// ── Task form dialog ──────────────────────────────────────────────────────────
+
+const TYPES_LIST = ['API', 'Native API', 'UI', 'Feature', 'Integration', 'Infrastructure', 'Testing'];
+const ROLES_LIST = ['Backend', 'Mobile', 'UI/UX', 'QA'];
+
+type TaskForm = {
+  title: string; description: string; group_label: string;
+  type: string; role: string; estimated_hours: string;
+  start_date: string; due_date: string;
+};
+const EMPTY_TASK_FORM: TaskForm = {
+  title: '', description: '', group_label: '',
+  type: '', role: '', estimated_hours: '',
+  start_date: '', due_date: '',
+};
+
+function TaskFormDialog({ open, editTarget, folderId, taskCount, onClose, onSaved }: {
+  open: boolean;
+  editTarget: Task | null;
+  folderId: string;
+  taskCount: number;
+  onClose: () => void;
+  onSaved: (task: Task) => void;
+}) {
+  const [form, setForm] = useState<TaskForm>(EMPTY_TASK_FORM);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setError('');
+      setForm(editTarget ? {
+        title: editTarget.title,
+        description: editTarget.description ?? '',
+        group_label: editTarget.group_label ?? '',
+        type: editTarget.type ?? '',
+        role: editTarget.role ?? '',
+        estimated_hours: editTarget.estimated_hours != null ? String(editTarget.estimated_hours) : '',
+        start_date: editTarget.start_date ?? '',
+        due_date: editTarget.due_date ?? '',
+      } : EMPTY_TASK_FORM);
+    }
+  }, [open, editTarget]);
+
+  function set<K extends keyof TaskForm>(key: K, val: string) {
+    setForm((p) => ({ ...p, [key]: val }));
+  }
+
+  async function handleSave() {
+    if (!form.title.trim()) return;
+    setSaving(true);
+    setError('');
+
+    const payload = {
+      title: form.title.trim(),
+      description: form.description.trim() || null,
+      group_label: form.group_label.trim() || null,
+      type: form.type || null,
+      role: form.role || null,
+      estimated_hours: form.estimated_hours ? parseFloat(form.estimated_hours) : null,
+      start_date: form.start_date || null,
+      due_date: form.due_date || null,
+      ...(editTarget ? {} : { folder_id: folderId, position: taskCount }),
+    };
+
+    const res = await fetch(
+      editTarget ? `/api/tasks/${editTarget.id}` : '/api/tasks',
+      { method: editTarget ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload) }
+    );
+    const data = await res.json();
+    setSaving(false);
+    if (!res.ok) { setError(data.error ?? 'Failed to save'); return; }
+    onSaved(data);
+  }
+
+  return (
+    <Dialog open={open} onClose={() => !saving && onClose()} maxWidth="sm" fullWidth>
+      <DialogTitle fontWeight={700}>{editTarget ? 'Edit task' : 'New task'}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {error && <Alert severity="error">{error}</Alert>}
+          <TextField label="Title" value={form.title} onChange={(e) => set('title', e.target.value)}
+            fullWidth autoFocus required />
+          <TextField label="Description" value={form.description}
+            onChange={(e) => set('description', e.target.value)}
+            fullWidth multiline rows={2} />
+          <TextField label="Group / Phase" value={form.group_label}
+            onChange={(e) => set('group_label', e.target.value)}
+            fullWidth placeholder="e.g. Phase 1 — Backend" />
+          <Stack direction="row" spacing={2}>
+            <TextField label="Type" select value={form.type}
+              onChange={(e) => set('type', e.target.value)} fullWidth>
+              <MenuItem value=""><em>None</em></MenuItem>
+              {TYPES_LIST.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+            </TextField>
+            <TextField label="Role" select value={form.role}
+              onChange={(e) => set('role', e.target.value)} fullWidth>
+              <MenuItem value=""><em>None</em></MenuItem>
+              {ROLES_LIST.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+            </TextField>
+          </Stack>
+          <Stack direction="row" spacing={2}>
+            <TextField label="Hours" type="number" value={form.estimated_hours}
+              onChange={(e) => set('estimated_hours', e.target.value)}
+              slotProps={{ htmlInput: { min: 0, step: 0.5 } }} fullWidth />
+            <TextField label="Start date" type="date" value={form.start_date}
+              onChange={(e) => set('start_date', e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+            <TextField label="Due date" type="date" value={form.due_date}
+              onChange={(e) => set('due_date', e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+          </Stack>
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button variant="contained" onClick={handleSave}
+          disabled={saving || !form.title.trim()}
+          startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}>
+          {saving ? 'Saving…' : editTarget ? 'Save changes' : 'Create'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -413,6 +566,8 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, cur
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [commentCounts, setCommentCounts] = useState<Map<string, number>>(new Map());
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Task | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [filterRole, setFilterRole] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -432,6 +587,33 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, cur
 
   function handleCommentAdded(taskId: string, _comment: TaskComment) {
     setCommentCounts((prev) => new Map(prev).set(taskId, (prev.get(taskId) ?? 0) + 1));
+  }
+
+  function openCreate() {
+    setEditTarget(null);
+    setTaskDialogOpen(true);
+  }
+
+  function openEdit(task: Task) {
+    setEditTarget(task);
+    setTaskDialogOpen(true);
+  }
+
+  async function handleDelete(id: string) {
+    const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+    if (res.ok || res.status === 204) {
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+    }
+  }
+
+  function handleTaskSaved(task: Task) {
+    setTasks((prev) => {
+      const idx = prev.findIndex((t) => t.id === task.id);
+      return idx >= 0
+        ? prev.map((t) => (t.id === task.id ? task : t))
+        : [...prev, task];
+    });
+    setTaskDialogOpen(false);
   }
 
   function toggleGroup(label: string) {
@@ -504,6 +686,12 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, cur
             {STATUSES.map((s) => <MenuItem key={s.value} value={s.value} sx={{ fontSize: 13 }}>{s.label}</MenuItem>)}
           </Select>
           {isAdmin && (
+            <Button size="small" variant="contained" startIcon={<AddIcon />}
+              onClick={openCreate}>
+              New task
+            </Button>
+          )}
+          {isAdmin && (
             <Button size="small" variant="outlined" startIcon={<UploadIcon />}
               onClick={() => setImportOpen(true)}>
               Import
@@ -556,14 +744,16 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, cur
                     ...(isOpen ? groupTasks.map((t) => (
                       <TaskRow key={t.id} task={t} isAdmin={isAdmin}
                         hasComments={(commentCounts.get(t.id) ?? 0) > 0}
-                        onStatusChange={handleStatusChange} onOpenComments={setActiveTask} />
+                        onStatusChange={handleStatusChange} onOpenComments={setActiveTask}
+                        onEdit={openEdit} onDelete={handleDelete} />
                     )) : []),
                   ];
                 })}
                 {ungrouped.map((t) => (
                   <TaskRow key={t.id} task={t} isAdmin={isAdmin}
                     hasComments={(commentCounts.get(t.id) ?? 0) > 0}
-                    onStatusChange={handleStatusChange} onOpenComments={setActiveTask} />
+                    onStatusChange={handleStatusChange} onOpenComments={setActiveTask}
+                    onEdit={openEdit} onDelete={handleDelete} />
                 ))}
               </TableBody>
             </Table>
@@ -589,6 +779,15 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, cur
       )}
 
       <CommentsDrawer task={activeTask} currentUser={currentUser} onClose={() => setActiveTask(null)} onCommentAdded={handleCommentAdded} />
+
+      <TaskFormDialog
+        open={taskDialogOpen}
+        editTarget={editTarget}
+        folderId={folderId}
+        taskCount={tasks.length}
+        onClose={() => setTaskDialogOpen(false)}
+        onSaved={handleTaskSaved}
+      />
 
       {importError && (
         <Alert severity="error" onClose={() => setImportError('')} sx={{ mt: 2 }}>
