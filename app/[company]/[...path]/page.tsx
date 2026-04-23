@@ -21,7 +21,6 @@ import { WhiteboardViewerClient } from '@/components/WhiteboardViewerClient';
 import { WhiteboardAdminPage } from '@/components/WhiteboardAdminPage';
 import { DocumentEditorForm } from '@/components/DocumentEditorForm';
 import { DocumentWithComments } from '@/components/DocumentWithComments';
-import { RoadmapDocRenderer } from '@/components/doc-renderers/RoadmapDocRenderer';
 import { TaskDocRenderer } from '@/components/doc-renderers/TaskDocRenderer';
 import { TicketDocRenderer } from '@/components/doc-renderers/TicketDocRenderer';
 import { MeetingDocRenderer } from '@/components/doc-renderers/MeetingDocRenderer';
@@ -31,7 +30,6 @@ import { splitDocumentContent } from '@/lib/document-content';
 import { ProjectDetail } from '@/components/ProjectDetail';
 import { ProjectTabs } from '@/components/ProjectTabs';
 import type { ProjectData } from '@/components/ProjectDetail';
-import type { RoadmapItem } from '@/components/RoadmapView';
 import type { ReportDoc } from '@/components/ReportList';
 import type { Task } from '@/components/TasksView';
 
@@ -132,16 +130,11 @@ export default async function SpacePathPage({
     const [
       { data: folderData },
       { data: rawCompanies },
-      { data: rawRoadmap },
       { data: rawTasks },
       { data: rawDocs },
     ] = await Promise.all([
       adminClient.from('folders').select('*').eq('id', resolved.folderId).single(),
       adminClient.from('companies').select('id, name, slug').order('name', { ascending: true }),
-      adminClient.from('documents')
-        .select('id, folder_id, title, description, position, created_at, metadata')
-        .eq('folder_id', resolved.folderId).eq('doc_type', 'roadmap')
-        .order('position', { ascending: true }),
       adminClient.from('documents')
         .select('id, folder_id, title, description, position, created_at, metadata')
         .eq('folder_id', resolved.folderId).eq('doc_type', 'task')
@@ -170,19 +163,6 @@ export default async function SpacePathPage({
     };
 
     const companies = (rawCompanies ?? []).map((c) => ({ id: c.id as string, name: c.name as string }));
-
-    const roadmapItems: RoadmapItem[] = (rawRoadmap ?? []).map((r) => {
-      const m = (r.metadata as Record<string, unknown>) ?? {};
-      return {
-        id: r.id, folder_id: r.folder_id, title: r.title,
-        description: r.description ?? null,
-        status: (m.status as string) ?? 'pending',
-        position: r.position ?? 0,
-        due_date: (m.due_date as string) ?? null,
-        completed_at: (m.completed_at as string) ?? null,
-        created_at: r.created_at,
-      };
-    });
 
     const tasks: Task[] = (rawTasks ?? []).map((t) => {
       const m = (t.metadata as Record<string, unknown>) ?? {};
@@ -234,7 +214,6 @@ export default async function SpacePathPage({
             folderId={resolved.folderId}
             projectStartAt={f.started_at ?? null}
             initialTasks={tasks}
-            roadmapItems={roadmapItems}
             reports={reports}
             initialSpec={f.tech_spec as Record<string, string> | null ?? null}
             isAdmin={isAdmin}
@@ -370,7 +349,7 @@ export default async function SpacePathPage({
       );
     }
 
-    const isStructured = ['roadmap', 'task', 'ticket', 'meeting'].includes(docType);
+    const isStructured = ['task', 'ticket', 'meeting'].includes(docType);
     let initialComments: Awaited<ReturnType<typeof buildInitialComments>> = [];
     let currentUser: { id: string; email: string; name: string } | null = null;
 
@@ -421,7 +400,6 @@ export default async function SpacePathPage({
 
           <Divider sx={{ mb: 4 }} />
 
-          {docType === 'roadmap' && <RoadmapDocRenderer metadata={metadata as Parameters<typeof RoadmapDocRenderer>[0]['metadata']} />}
           {docType === 'task'    && <TaskDocRenderer    metadata={metadata as Parameters<typeof TaskDocRenderer>[0]['metadata']}    bodyHtml={parsed.body} />}
           {docType === 'ticket'  && <TicketDocRenderer  metadata={metadata as Parameters<typeof TicketDocRenderer>[0]['metadata']}  body={parsed.body} />}
           {docType === 'meeting' && <MeetingDocRenderer metadata={metadata as Parameters<typeof MeetingDocRenderer>[0]['metadata']} body={parsed.body} />}

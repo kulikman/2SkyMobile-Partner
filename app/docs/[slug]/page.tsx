@@ -18,7 +18,6 @@ import { withDefaultSharing } from "@/lib/document-sharing";
 import { splitDocumentContent } from "@/lib/document-content";
 import { DocumentMetaPopover } from "@/components/DocumentMetaPopover";
 import { DownloadButtons } from "@/components/DownloadButtons";
-import { RoadmapDocRenderer } from "@/components/doc-renderers/RoadmapDocRenderer";
 import { TaskDocRenderer } from "@/components/doc-renderers/TaskDocRenderer";
 import { TicketDocRenderer } from "@/components/doc-renderers/TicketDocRenderer";
 import { MeetingDocRenderer } from "@/components/doc-renderers/MeetingDocRenderer";
@@ -67,7 +66,7 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const docMetadata: Record<string, unknown> = (baseDoc as any).metadata ?? {};
   const isWhiteboard = docType === "whiteboard";
-  const isStructured = ["roadmap", "task", "ticket", "meeting"].includes(docType);
+  const isStructured = ["task", "ticket", "meeting"].includes(docType);
   const isAdmin = user?.user_metadata?.role === "admin";
 
   if (isWhiteboard) {
@@ -162,7 +161,6 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
         )}
 
         {/* Structured doc renderers */}
-        {docType === "roadmap" && <RoadmapDocRenderer metadata={docMetadata as Parameters<typeof RoadmapDocRenderer>[0]["metadata"]} />}
         {docType === "task"    && <TaskDocRenderer    metadata={docMetadata as Parameters<typeof TaskDocRenderer>[0]["metadata"]}    bodyHtml={parsed.body} />}
         {docType === "ticket"  && <TicketDocRenderer  metadata={docMetadata as Parameters<typeof TicketDocRenderer>[0]["metadata"]}  body={parsed.body} />}
         {docType === "meeting" && <MeetingDocRenderer metadata={docMetadata as Parameters<typeof MeetingDocRenderer>[0]["metadata"]} body={parsed.body} />}

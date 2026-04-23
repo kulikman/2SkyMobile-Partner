@@ -11,7 +11,6 @@ import { ProjectDetail } from '@/components/ProjectDetail';
 import { ProjectTabs } from '@/components/ProjectTabs';
 import { getDisplayName } from '@/lib/user-display';
 import type { ProjectData } from '@/components/ProjectDetail';
-import type { RoadmapItem } from '@/components/RoadmapView';
 import type { ReportDoc } from '@/components/ReportList';
 import type { Task } from '@/components/TasksView';
 
@@ -75,26 +74,6 @@ export default async function ProjectPage({
   const folderCompany = folder.company_id
     ? (rawCompanies ?? []).find((c) => c.id === folder.company_id) ?? null
     : null;
-
-  const { data: rawRoadmap } = await adminClient
-    .from('documents')
-    .select('id, folder_id, title, description, position, created_at, metadata')
-    .eq('folder_id', id)
-    .eq('doc_type', 'roadmap')
-    .order('position', { ascending: true });
-
-  const roadmapItems: RoadmapItem[] = (rawRoadmap ?? []).map((r) => {
-    const m = (r.metadata as Record<string, unknown>) ?? {};
-    return {
-      id: r.id, folder_id: r.folder_id, title: r.title,
-      description: r.description ?? null,
-      status: (m.status as string) ?? 'pending',
-      position: r.position ?? 0,
-      due_date: (m.due_date as string) ?? null,
-      completed_at: (m.completed_at as string) ?? null,
-      created_at: r.created_at,
-    };
-  });
 
   const { data: rawTasks } = await adminClient
     .from('documents')
@@ -174,7 +153,6 @@ export default async function ProjectPage({
           folderId={id}
           projectStartAt={folder.started_at ?? null}
           initialTasks={tasks}
-          roadmapItems={roadmapItems}
           reports={reports}
           initialSpec={f.tech_spec as Record<string, string> | null ?? null}
           isAdmin={isAdmin}
