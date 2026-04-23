@@ -43,6 +43,7 @@ export type CompanyForDashboard = {
   name: string;
   slug: string | null;
   color: string | null;
+  logo_url?: string | null;
 };
 
 const STATUS_MAP: Record<string, { label: string; hex: string }> = {
@@ -137,10 +138,20 @@ function CompanySection({
         <Box sx={{
           width: 34, height: 34, borderRadius: 1.5, bgcolor: accent,
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          overflow: 'hidden',
         }}>
-          <Typography sx={{ color: 'white', fontWeight: 800, fontSize: 12, letterSpacing: 0.5 }}>
-            {initials}
-          </Typography>
+          {company.logo_url ? (
+            <Box
+              component="img"
+              src={company.logo_url}
+              alt={company.name}
+              sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : (
+            <Typography sx={{ color: 'white', fontWeight: 800, fontSize: 12, letterSpacing: 0.5 }}>
+              {initials}
+            </Typography>
+          )}
         </Box>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -264,13 +275,13 @@ export function ProjectDashboard({
   // Build sections: companies in order, unassigned last
   const sections: { company: CompanyForDashboard; projects: ProjectForDashboard[] }[] = [];
 
-  for (const c of companies) {
+  for (const c of companyOptions) {
     const cp = projects.filter((p) => p.company_id === c.id);
     if (cp.length > 0) sections.push({ company: c, projects: cp });
   }
 
   const unassigned = projects.filter(
-    (p) => !p.company_id || !companies.find((c) => c.id === p.company_id)
+    (p) => !p.company_id || !companyOptions.find((c) => c.id === p.company_id)
   );
   if (unassigned.length > 0) {
     sections.push({
@@ -279,7 +290,7 @@ export function ProjectDashboard({
     });
   }
 
-  const totalActive = companies.filter((c) => projects.some((p) => p.company_id === c.id)).length;
+  const totalActive = companyOptions.filter((c) => projects.some((p) => p.company_id === c.id)).length;
 
   return (
     <Box>
