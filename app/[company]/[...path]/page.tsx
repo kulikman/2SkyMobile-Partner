@@ -224,14 +224,16 @@ export default async function SpacePathPage({
                   const href = slug ? `${base}/${[...path, slug].join('/')}` : `/projects/${folder.id}`;
                   return (
                     <Grid key={folder.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                      <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                        <CardActionArea component={Link} href={href}>
-                          <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <FolderIcon sx={{ color: folder.color ?? 'text.secondary', flexShrink: 0 }} />
-                            <Typography fontWeight={600} noWrap>{folder.name}</Typography>
-                          </CardContent>
-                        </CardActionArea>
-                      </Card>
+                      <Link href={href} style={{ textDecoration: 'none' }}>
+                        <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                          <CardActionArea>
+                            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <FolderIcon sx={{ color: folder.color ?? 'text.secondary', flexShrink: 0 }} />
+                              <Typography fontWeight={600} noWrap>{folder.name}</Typography>
+                            </CardContent>
+                          </CardActionArea>
+                        </Card>
+                      </Link>
                     </Grid>
                   );
                 })}
@@ -244,17 +246,19 @@ export default async function SpacePathPage({
               <Typography variant="overline" color="text.secondary" sx={{ mb: 1, display: 'block' }}>Documents</Typography>
               <Grid container spacing={2}>
                 {(docs ?? []).map((doc) => {
-                  const href = doc.slug ? `${base}/${[...path, doc.slug].join('/')}` : `/docs/${doc.slug}`;
+                  const href = doc.slug ? `${base}/${[...path, doc.slug].join('/')}` : `/docs/${doc.id}`;
                   return (
                     <Grid key={doc.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                      <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                        <CardActionArea component={Link} href={href}>
-                          <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <DescriptionIcon sx={{ color: 'text.secondary', flexShrink: 0 }} />
-                            <Typography fontWeight={600} noWrap>{doc.title}</Typography>
-                          </CardContent>
-                        </CardActionArea>
-                      </Card>
+                      <Link href={href} style={{ textDecoration: 'none' }}>
+                        <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                          <CardActionArea>
+                            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <DescriptionIcon sx={{ color: 'text.secondary', flexShrink: 0 }} />
+                              <Typography fontWeight={600} noWrap>{doc.title}</Typography>
+                            </CardContent>
+                          </CardActionArea>
+                        </Card>
+                      </Link>
                     </Grid>
                   );
                 })}
@@ -343,10 +347,11 @@ export default async function SpacePathPage({
           }}>
             <Typography variant="h4" fontWeight={700}>{doc.title}</Typography>
             {editHref && (
-              <Button component={Link} href={editHref} variant="outlined" size="small"
-                startIcon={<EditIcon fontSize="small" />}>
-                Edit
-              </Button>
+              <Link href={editHref} style={{ textDecoration: 'none' }}>
+                <Button variant="outlined" size="small" startIcon={<EditIcon fontSize="small" />}>
+                  Edit
+                </Button>
+              </Link>
             )}
           </Box>
 

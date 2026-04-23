@@ -77,14 +77,16 @@ export default async function CompanySpacePage({
               const href = slug ? `${base}/${slug}` : `/projects/${folder.id}`;
               return (
                 <Grid key={folder.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                  <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                    <CardActionArea component={Link} href={href}>
-                      <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <FolderIcon sx={{ color: folder.color ?? 'text.secondary', flexShrink: 0 }} />
-                        <Typography fontWeight={600} noWrap>{folder.name}</Typography>
-                      </CardContent>
-                    </CardActionArea>
-                  </Card>
+                  <Link href={href} style={{ textDecoration: 'none' }}>
+                    <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                      <CardActionArea>
+                        <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <FolderIcon sx={{ color: folder.color ?? 'text.secondary', flexShrink: 0 }} />
+                          <Typography fontWeight={600} noWrap>{folder.name}</Typography>
+                        </CardContent>
+                      </CardActionArea>
+                    </Card>
+                  </Link>
                 </Grid>
               );
             })}
