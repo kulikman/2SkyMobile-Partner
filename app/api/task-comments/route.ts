@@ -7,14 +7,21 @@ export async function GET(req: NextRequest) {
   if (!taskId) return NextResponse.json({ error: 'taskId is required' }, { status: 400 });
 
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // task documents share the same UUID — document_id = old task_id
   const { data, error } = await supabase
-    .from('task_comments')
+    .from('comments')
     .select('*')
-    .eq('task_id', taskId)
+    .eq('document_id', taskId)
     .order('created_at', { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+
+  // Map document_id → task_id so UI doesn't need changes
+  const mapped = (data ?? []).map((c) => ({ ...c, task_id: c.document_id }));
+  return NextResponse.json(mapped);
 }
 
 export async function POST(req: NextRequest) {
@@ -34,9 +41,9 @@ export async function POST(req: NextRequest) {
   const author_name = getDisplayName({ email: user.email, metadata: user.user_metadata ?? null });
 
   const { data: comment, error } = await supabase
-    .from('task_comments')
+    .from('comments')
     .insert({
-      task_id,
+      document_id: task_id,
       user_id: user.id,
       author_name,
       content: content.trim(),
@@ -47,15 +54,20 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Notify task owner / project members about new comment
+  // Notify project members about new comment
   try {
     const adminClient = await createAdminClient();
-    const { data: task } = await adminClient.from('tasks').select('title, folder_id').eq('id', task_id).single();
-    if (task) {
-      const { data: folder } = await adminClient.from('folders').select('company_id').eq('id', task.folder_id).single();
+    const { data: doc } = await adminClient
+      .from('documents')
+      .select('title, folder_id')
+      .eq('id', task_id)
+      .single();
+
+    if (doc) {
+      const { data: folder } = await adminClient
+        .from('folders').select('company_id').eq('id', doc.folder_id).single();
       const { data: { users: allUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
 
-      // Notify: admins + partner of this company (excluding commenter)
       const targets = allUsers.filter((u) => {
         if (u.id === user.id) return false;
         return u.user_metadata?.role === 'admin' ||
@@ -68,14 +80,14 @@ export async function POST(req: NextRequest) {
           adminClient.from('notifications').insert({
             user_id: t.id,
             type: isReply ? 'new_reply' : 'new_comment',
-            title: isReply ? `New reply on "${task.title}"` : `New comment on "${task.title}"`,
+            title: isReply ? `New reply on "${doc.title}"` : `New comment on "${doc.title}"`,
             body: content.trim().slice(0, 120),
-            link: `/projects/${task.folder_id}?tab=tasks&task=${task_id}`,
+            link: `/projects/${doc.folder_id}?tab=tasks&task=${task_id}`,
           })
         )
       );
     }
   } catch { /* notifications are best-effort */ }
 
-  return NextResponse.json(comment, { status: 201 });
+  return NextResponse.json({ ...comment, task_id: comment.document_id }, { status: 201 });
 }

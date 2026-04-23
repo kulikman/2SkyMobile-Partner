@@ -12,7 +12,7 @@ export async function DELETE(
 
   const adminClient = await createAdminClient();
   const { data: comment } = await adminClient
-    .from('task_comments').select('user_id').eq('id', id).single();
+    .from('comments').select('user_id').eq('id', id).single();
 
   if (!comment) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -21,7 +21,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { error } = await adminClient.from('task_comments').delete().eq('id', id);
+  const { error } = await adminClient.from('comments').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return new NextResponse(null, { status: 204 });
 }

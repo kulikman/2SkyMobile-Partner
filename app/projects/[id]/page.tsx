@@ -71,44 +71,51 @@ export default async function ProjectPage({
 
   const companies = (rawCompanies ?? []).map((c) => ({ id: c.id as string, name: c.name as string }));
 
-  const { data: rawRoadmap } = await supabase
-    .from('roadmap_items')
-    .select('*')
+  const { data: rawRoadmap } = await adminClient
+    .from('documents')
+    .select('id, folder_id, title, description, position, created_at, metadata')
     .eq('folder_id', id)
+    .eq('doc_type', 'roadmap')
     .order('position', { ascending: true });
 
-  const roadmapItems: RoadmapItem[] = (rawRoadmap ?? []).map((r) => ({
-    id: r.id,
-    folder_id: r.folder_id,
-    title: r.title,
-    description: r.description ?? null,
-    status: r.status ?? 'pending',
-    position: r.position ?? 0,
-    due_date: r.due_date ?? null,
-    completed_at: r.completed_at ?? null,
-    created_at: r.created_at,
-  }));
+  const roadmapItems: RoadmapItem[] = (rawRoadmap ?? []).map((r) => {
+    const m = (r.metadata as Record<string, unknown>) ?? {};
+    return {
+      id: r.id, folder_id: r.folder_id, title: r.title,
+      description: r.description ?? null,
+      status: (m.status as string) ?? 'pending',
+      position: r.position ?? 0,
+      due_date: (m.due_date as string) ?? null,
+      completed_at: (m.completed_at as string) ?? null,
+      created_at: r.created_at,
+    };
+  });
 
-  const { data: rawTasks } = await supabase
-    .from('tasks')
-    .select('*')
+  const { data: rawTasks } = await adminClient
+    .from('documents')
+    .select('id, folder_id, title, description, position, created_at, metadata')
     .eq('folder_id', id)
+    .eq('doc_type', 'task')
     .order('position', { ascending: true });
 
-  const tasks: Task[] = (rawTasks ?? []).map((t) => ({
-    id: t.id, folder_id: t.folder_id,
-    group_label: t.group_label ?? null, title: t.title,
-    description: t.description ?? null, type: t.type ?? null,
-    role: t.role ?? null, status: t.status ?? 'backlog',
-    estimated_hours: t.estimated_hours ?? null,
-    start_date: t.start_date ?? null, due_date: t.due_date ?? null,
-    completed_at: t.completed_at ?? null, created_at: t.created_at,
-  }));
+  const tasks: Task[] = (rawTasks ?? []).map((t) => {
+    const m = (t.metadata as Record<string, unknown>) ?? {};
+    return {
+      id: t.id, folder_id: t.folder_id,
+      group_label: (m.group_label as string) ?? null, title: t.title,
+      description: t.description ?? null, type: (m.type as string) ?? null,
+      role: (m.role as string) ?? null, status: (m.status as string) ?? 'backlog',
+      estimated_hours: (m.estimated_hours as number) ?? null,
+      start_date: (m.start_date as string) ?? null, due_date: (m.due_date as string) ?? null,
+      completed_at: (m.completed_at as string) ?? null, created_at: t.created_at,
+    };
+  });
 
   const { data: rawDocs } = await supabase
     .from('documents')
     .select('id, slug, title, description, report_type, report_period_start, report_period_end, created_at')
     .eq('folder_id', id)
+    .eq('doc_type', 'md')
     .order('created_at', { ascending: false });
 
   const reports: ReportDoc[] = (rawDocs ?? []).map((d: Record<string, unknown>) => ({

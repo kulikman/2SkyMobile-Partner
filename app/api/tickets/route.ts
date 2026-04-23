@@ -1,5 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
+import { toSlug } from '@/lib/slug';
+import { randomBytes } from 'crypto';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function docToTicket(doc: Record<string, any>, createdByEmail = '') {
+  const m = doc.metadata ?? {};
+  return {
+    id: doc.id,
+    folder_id: doc.folder_id,
+    title: doc.title,
+    description: doc.description,
+    created_at: doc.created_at,
+    status: m.status ?? 'new',
+    type: m.type ?? null,
+    priority: m.priority ?? 'medium',
+    severity: m.severity ?? 'moderate',
+    module: m.module ?? null,
+    url: m.url ?? null,
+    screenshot_path: m.screenshot_path ?? null,
+    created_by: m.created_by ?? null,
+    comments: m.comments ?? null,
+    updated_at: m.updated_at ?? doc.created_at,
+    created_by_email: createdByEmail,
+  };
+}
 
 export async function GET(req: NextRequest) {
   const folderId = req.nextUrl.searchParams.get('folderId');
@@ -11,17 +36,21 @@ export async function GET(req: NextRequest) {
 
   const adminClient = await createAdminClient();
   const { data, error } = await adminClient
-    .from('tickets')
-    .select('*')
+    .from('documents')
+    .select('id, folder_id, title, description, created_at, metadata')
     .eq('folder_id', folderId)
+    .eq('doc_type', 'ticket')
     .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const { data: { users } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
   const userMap = new Map(users.map((u) => [u.id, u.email ?? '']));
-  const enriched = (data ?? []).map((t) => ({ ...t, created_by_email: userMap.get(t.created_by) ?? '' }));
 
+  const enriched = (data ?? []).map((doc) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    docToTicket(doc as Record<string, any>, userMap.get(doc.metadata?.created_by) ?? '')
+  );
   return NextResponse.json(enriched);
 }
 
@@ -35,34 +64,42 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
-  const {
-    folder_id, title, description, url, screenshot_path,
-    module, type, priority, severity, comments,
-  } = body;
+  const { folder_id, title, description, url, screenshot_path,
+    module, type, priority, severity, comments } = body;
 
   if (!folder_id || !title?.trim()) {
     return NextResponse.json({ error: 'folder_id and title required' }, { status: 400 });
   }
 
+  const slug = `${toSlug(title.trim()) || 'ticket'}-i-${randomBytes(4).toString('hex')}`;
+
   const adminClient = await createAdminClient();
   const { data, error } = await adminClient
-    .from('tickets')
+    .from('documents')
     .insert({
       folder_id,
       title: title.trim(),
-      description: description?.trim() || null,
-      url: url?.trim() || null,
-      screenshot_path: screenshot_path || null,
-      module: module?.trim() || null,
-      type: type?.trim() || null,
-      priority: priority || 'medium',
-      severity: severity || 'moderate',
-      comments: comments?.trim() || null,
-      created_by: user.id,
+      description: description?.trim() ?? null,
+      content: description?.trim() ?? '',
+      slug,
+      doc_type: 'ticket',
+      metadata: {
+        status: 'new',
+        type: type?.trim() ?? null,
+        priority: priority ?? 'medium',
+        severity: severity ?? 'moderate',
+        module: module?.trim() ?? null,
+        url: url?.trim() ?? null,
+        screenshot_path: screenshot_path ?? null,
+        created_by: user.id,
+        comments: comments?.trim() ?? null,
+        updated_at: new Date().toISOString(),
+      },
     })
-    .select()
+    .select('id, folder_id, title, description, created_at, metadata')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ...data, created_by_email: user.email ?? '' }, { status: 201 });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return NextResponse.json(docToTicket(data as Record<string, any>, user.email ?? ''), { status: 201 });
 }

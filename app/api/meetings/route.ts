@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
+import { toSlug } from '@/lib/slug';
+import { randomBytes } from 'crypto';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function docToMeeting(doc: Record<string, any>) {
+  const m = doc.metadata ?? {};
+  return {
+    id: doc.id,
+    folder_id: doc.folder_id,
+    title: doc.title,
+    created_at: doc.created_at,
+    meeting_date: m.meeting_date ?? null,
+    summary: m.summary ?? null,
+  };
+}
 
 export async function GET(req: NextRequest) {
   const folderId = req.nextUrl.searchParams.get('folderId');
@@ -9,14 +24,17 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data, error } = await supabase
-    .from('meetings')
-    .select('*')
+  const adminClient = await createAdminClient();
+  const { data, error } = await adminClient
+    .from('documents')
+    .select('id, folder_id, title, created_at, metadata')
     .eq('folder_id', folderId)
-    .order('meeting_date', { ascending: false });
+    .eq('doc_type', 'meeting')
+    .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return NextResponse.json((data ?? []).map((d) => docToMeeting(d as Record<string, any>)));
 }
 
 export async function POST(req: NextRequest) {
@@ -36,13 +54,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'folder_id, title, meeting_date required' }, { status: 400 });
   }
 
+  const slug = `${toSlug(title) || 'meeting'}-m-${randomBytes(4).toString('hex')}`;
+
   const adminClient = await createAdminClient();
   const { data, error } = await adminClient
-    .from('meetings')
-    .insert({ folder_id, title, meeting_date, summary: summary ?? null })
-    .select()
+    .from('documents')
+    .insert({
+      folder_id,
+      title,
+      content: summary ?? '',
+      slug,
+      doc_type: 'meeting',
+      metadata: { meeting_date, summary: summary ?? null },
+    })
+    .select('id, folder_id, title, created_at, metadata')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data, { status: 201 });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return NextResponse.json(docToMeeting(data as Record<string, any>), { status: 201 });
 }

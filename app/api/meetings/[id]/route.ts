@@ -17,17 +17,39 @@ export async function PATCH(
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
-  const updates: Record<string, unknown> = {};
-  if (body.title !== undefined)        updates.title        = body.title;
-  if (body.meeting_date !== undefined) updates.meeting_date = body.meeting_date;
-  if (body.summary !== undefined)      updates.summary      = body.summary;
-
   const adminClient = await createAdminClient();
+  const { data: current, error: fetchError } = await adminClient
+    .from('documents')
+    .select('title, metadata')
+    .eq('id', id)
+    .eq('doc_type', 'meeting')
+    .single();
+
+  if (fetchError || !current) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const docUpdates: Record<string, unknown> = {};
+  if (body.title !== undefined) { docUpdates.title = body.title; docUpdates.content = body.title; }
+
+  const meta = { ...(current.metadata as Record<string, unknown>) };
+  if (body.meeting_date !== undefined) meta.meeting_date = body.meeting_date;
+  if (body.summary !== undefined) { meta.summary = body.summary; docUpdates.content = body.summary ?? ''; }
+  docUpdates.metadata = meta;
+
   const { data, error } = await adminClient
-    .from('meetings').update(updates).eq('id', id).select().single();
+    .from('documents')
+    .update(docUpdates)
+    .eq('id', id)
+    .eq('doc_type', 'meeting')
+    .select('id, folder_id, title, created_at, metadata')
+    .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+
+  const m = (data.metadata as Record<string, unknown>) ?? {};
+  return NextResponse.json({
+    id: data.id, folder_id: data.folder_id, title: data.title,
+    created_at: data.created_at, meeting_date: m.meeting_date ?? null, summary: m.summary ?? null,
+  });
 }
 
 export async function DELETE(
@@ -42,7 +64,7 @@ export async function DELETE(
   }
 
   const adminClient = await createAdminClient();
-  const { error } = await adminClient.from('meetings').delete().eq('id', id);
+  const { error } = await adminClient.from('documents').delete().eq('id', id).eq('doc_type', 'meeting');
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return new NextResponse(null, { status: 204 });
 }

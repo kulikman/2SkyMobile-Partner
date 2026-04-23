@@ -1,6 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function docToTask(doc: Record<string, any>) {
+  const m = doc.metadata ?? {};
+  return {
+    id: doc.id,
+    folder_id: doc.folder_id,
+    title: doc.title,
+    description: doc.description,
+    position: doc.position,
+    created_at: doc.created_at,
+    status: m.status ?? 'backlog',
+    type: m.type ?? null,
+    role: m.role ?? null,
+    group_label: m.group_label ?? null,
+    estimated_hours: m.estimated_hours ?? null,
+    depends_on: m.depends_on ?? [],
+    start_date: m.start_date ?? null,
+    due_date: m.due_date ?? null,
+    completed_at: m.completed_at ?? null,
+  };
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -18,32 +40,49 @@ export async function PATCH(
   const isAdmin = user.user_metadata?.role === 'admin';
   if (!isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const updates: Record<string, unknown> = {};
-  if (body.title !== undefined)           updates.title           = body.title;
-  if (body.description !== undefined)     updates.description     = body.description;
-  if (body.group_label !== undefined)     updates.group_label     = body.group_label;
-  if (body.type !== undefined)            updates.type            = body.type;
-  if (body.role !== undefined)            updates.role            = body.role;
-  if (body.estimated_hours !== undefined) updates.estimated_hours = body.estimated_hours;
-  if (body.depends_on !== undefined)      updates.depends_on      = body.depends_on;
-  if (body.position !== undefined)        updates.position        = body.position;
-  if (body.start_date !== undefined)      updates.start_date      = body.start_date;
-  if (body.due_date !== undefined)        updates.due_date        = body.due_date;
-  if (body.status !== undefined) {
-    updates.status = body.status;
-    updates.completed_at = body.status === 'done' ? new Date().toISOString() : null;
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
-  }
-
   const adminClient = await createAdminClient();
+  const { data: current, error: fetchError } = await adminClient
+    .from('documents')
+    .select('folder_id, title, description, position, metadata')
+    .eq('id', id)
+    .eq('doc_type', 'task')
+    .single();
+
+  if (fetchError || !current) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const docUpdates: Record<string, unknown> = {};
+  if (body.title !== undefined) docUpdates.title = body.title;
+  if (body.description !== undefined) {
+    docUpdates.description = body.description;
+    docUpdates.content = body.description ?? '';
+  }
+  if (body.position !== undefined) docUpdates.position = body.position;
+
+  const meta = { ...(current.metadata as Record<string, unknown>) };
+  if (body.group_label !== undefined) meta.group_label = body.group_label;
+  if (body.type !== undefined) meta.type = body.type;
+  if (body.role !== undefined) meta.role = body.role;
+  if (body.estimated_hours !== undefined) meta.estimated_hours = body.estimated_hours;
+  if (body.depends_on !== undefined) meta.depends_on = body.depends_on;
+  if (body.start_date !== undefined) meta.start_date = body.start_date;
+  if (body.due_date !== undefined) meta.due_date = body.due_date;
+  if (body.status !== undefined) {
+    meta.status = body.status;
+    meta.completed_at = body.status === 'done' ? new Date().toISOString() : null;
+  }
+  docUpdates.metadata = meta;
+
   const { data, error } = await adminClient
-    .from('tasks').update(updates).eq('id', id).select().single();
+    .from('documents')
+    .update(docUpdates)
+    .eq('id', id)
+    .eq('doc_type', 'task')
+    .select('id, folder_id, title, description, position, created_at, metadata')
+    .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return NextResponse.json(docToTask(data as Record<string, any>));
 }
 
 export async function DELETE(
@@ -57,7 +96,9 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { error } = await supabase.from('tasks').delete().eq('id', id);
+  const adminClient = await createAdminClient();
+  const { error } = await adminClient
+    .from('documents').delete().eq('id', id).eq('doc_type', 'task');
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return new NextResponse(null, { status: 204 });
 }
