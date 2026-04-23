@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { toSlug, uniqueSlug } from '@/lib/slug';
 
 export async function GET() {
   const supabase = await createClient();
@@ -30,10 +31,21 @@ export async function POST(request: Request) {
     status, progress, client_name, started_at, deadline_at,
     company_id,
   } = body;
+
+  // Auto-generate unique slug
+  const base = toSlug(name ?? '');
+  const scopeQuery = parent_id
+    ? supabase.from('folders').select('slug').eq('parent_id', parent_id)
+    : supabase.from('folders').select('slug').eq('company_id', company_id ?? '').is('parent_id', null);
+  const { data: existing } = await scopeQuery;
+  const existingSlugs = new Set((existing ?? []).map((r: { slug: string | null }) => r.slug ?? ''));
+  const slug = uniqueSlug(base, existingSlugs);
+
   const { data, error } = await supabase
     .from('folders')
     .insert({
       name,
+      slug,
       color: color ?? null,
       icon: icon ?? null,
       position: position ?? 0,

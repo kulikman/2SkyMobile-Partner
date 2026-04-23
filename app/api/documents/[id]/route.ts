@@ -35,6 +35,7 @@ export async function PATCH(
     publicAccessEnabled = false,
     publicCommentsVisible = false,
     anonymousCommentsEnabled = false,
+    metadata = undefined,
   } = body;
   if (!title || !slug || !content) {
     return NextResponse.json({ error: 'title, slug and content are required' }, { status: 400 });
@@ -53,6 +54,7 @@ export async function PATCH(
       public_access_enabled: Boolean(publicAccessEnabled),
       public_comments_visible: Boolean(publicAccessEnabled && publicCommentsVisible),
       anonymous_comments_enabled: Boolean(publicAccessEnabled && publicCommentsVisible && anonymousCommentsEnabled),
+      ...(metadata !== undefined ? { metadata } : {}),
     })
     .eq('id', id)
     .select('id, slug, title, description, image, content, created_at, folder_id, position, card_color, card_icon, public_access_enabled, public_comments_visible, anonymous_comments_enabled, public_share_token')

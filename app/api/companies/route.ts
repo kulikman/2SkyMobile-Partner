@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
+import { toSlug, uniqueSlug } from '@/lib/slug';
 
 export async function GET() {
   const supabase = await createClient();
@@ -33,10 +34,16 @@ export async function POST(req: NextRequest) {
 
   const adminClient = await createAdminClient();
 
+  // Auto-generate unique slug for the company
+  const base = toSlug(name.trim());
+  const { data: existingCos } = await adminClient.from('companies').select('slug');
+  const existingSlugs = new Set((existingCos ?? []).map((r: { slug: string | null }) => r.slug ?? ''));
+  const slug = uniqueSlug(base, existingSlugs);
+
   // Create company record
   const { data: company, error: companyError } = await adminClient
     .from('companies')
-    .insert({ name: name.trim(), logo_url: logo_url ?? null })
+    .insert({ name: name.trim(), slug, logo_url: logo_url ?? null })
     .select()
     .single();
 

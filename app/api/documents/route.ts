@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     report_type = null,
     report_period_start = null,
     report_period_end = null,
+    metadata = null,
   } = body;
   if (!title || !slug || !content) {
     return NextResponse.json({ error: "title, slug and content are required" }, { status: 400 });
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
       report_type: report_type ?? null,
       report_period_start: report_period_start ?? null,
       report_period_end: report_period_end ?? null,
+      ...(metadata !== null ? { metadata } : {}),
     })
     .select(
       "id, slug, title, content, description, image, doc_type, created_at, folder_id, position, card_color, card_icon, public_access_enabled, public_comments_visible, anonymous_comments_enabled, public_share_token",
