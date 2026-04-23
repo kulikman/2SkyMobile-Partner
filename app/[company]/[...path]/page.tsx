@@ -8,6 +8,7 @@ import CardActionArea from '@mui/material/CardActionArea';
 import CardContent from '@mui/material/CardContent';
 import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
 import FolderIcon from '@mui/icons-material/Folder';
 import DescriptionIcon from '@mui/icons-material/Description';
 import EditIcon from '@mui/icons-material/Edit';
@@ -25,6 +26,12 @@ import { MeetingDocRenderer } from '@/components/doc-renderers/MeetingDocRendere
 import { buildInitialComments } from '@/lib/comment-view-models';
 import { getDisplayName } from '@/lib/user-display';
 import { splitDocumentContent } from '@/lib/document-content';
+import { ProjectDetail } from '@/components/ProjectDetail';
+import { ProjectTabs } from '@/components/ProjectTabs';
+import type { ProjectData } from '@/components/ProjectDetail';
+import type { RoadmapItem } from '@/components/RoadmapView';
+import type { ReportDoc } from '@/components/ReportList';
+import type { Task } from '@/components/TasksView';
 
 const RESERVED = new Set([
   'login', 'admin', 'projects', 'docs', 'share', 'blueprint',
@@ -47,7 +54,141 @@ export default async function SpacePathPage({
   const resolved = await resolveSpacePath(companySlug, path);
   if (!resolved) notFound();
 
-  // ── Folder view ──────────────────────────────────────────────────────────
+  // ── Top-level project folder → full project view ──────────────────────────
+  if (resolved.kind === 'folder' && path.length === 1) {
+    const adminClient = await createAdminClient();
+
+    if (!isAdmin) {
+      const { data: membership } = await adminClient
+        .from('company_members').select('id')
+        .eq('company_id', resolved.companyId).eq('user_id', user.id).single();
+      if (!membership) notFound();
+    }
+
+    const [
+      { data: folderData },
+      { data: rawCompanies },
+      { data: rawRoadmap },
+      { data: rawTasks },
+      { data: rawDocs },
+    ] = await Promise.all([
+      adminClient.from('folders').select('*').eq('id', resolved.folderId).single(),
+      adminClient.from('companies').select('id, name, slug').order('name', { ascending: true }),
+      adminClient.from('documents')
+        .select('id, folder_id, title, description, position, created_at, metadata')
+        .eq('folder_id', resolved.folderId).eq('doc_type', 'roadmap')
+        .order('position', { ascending: true }),
+      adminClient.from('documents')
+        .select('id, folder_id, title, description, position, created_at, metadata')
+        .eq('folder_id', resolved.folderId).eq('doc_type', 'task')
+        .order('position', { ascending: true }),
+      adminClient.from('documents')
+        .select('id, slug, title, description, report_type, report_period_start, report_period_end, created_at')
+        .eq('folder_id', resolved.folderId).eq('doc_type', 'md')
+        .order('created_at', { ascending: false }),
+    ]);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const f = (folderData ?? {}) as Record<string, any>;
+
+    const project: ProjectData = {
+      id: resolved.folderId,
+      name: resolved.folderName,
+      color: f.color ?? null,
+      icon: f.icon ?? null,
+      status: f.status ?? 'in_discussion',
+      progress: f.progress ?? 0,
+      client_name: f.client_name ?? null,
+      company_id: resolved.companyId,
+      started_at: f.started_at ?? null,
+      deadline_at: f.deadline_at ?? null,
+      stage_url: f.stage_url ?? null,
+    };
+
+    const companies = (rawCompanies ?? []).map((c) => ({ id: c.id as string, name: c.name as string }));
+
+    const roadmapItems: RoadmapItem[] = (rawRoadmap ?? []).map((r) => {
+      const m = (r.metadata as Record<string, unknown>) ?? {};
+      return {
+        id: r.id, folder_id: r.folder_id, title: r.title,
+        description: r.description ?? null,
+        status: (m.status as string) ?? 'pending',
+        position: r.position ?? 0,
+        due_date: (m.due_date as string) ?? null,
+        completed_at: (m.completed_at as string) ?? null,
+        created_at: r.created_at,
+      };
+    });
+
+    const tasks: Task[] = (rawTasks ?? []).map((t) => {
+      const m = (t.metadata as Record<string, unknown>) ?? {};
+      return {
+        id: t.id, folder_id: t.folder_id,
+        group_label: (m.group_label as string) ?? null, title: t.title,
+        description: t.description ?? null, type: (m.type as string) ?? null,
+        role: (m.role as string) ?? null, status: (m.status as string) ?? 'backlog',
+        estimated_hours: (m.estimated_hours as number) ?? null,
+        start_date: (m.start_date as string) ?? null, due_date: (m.due_date as string) ?? null,
+        completed_at: (m.completed_at as string) ?? null, created_at: t.created_at,
+      };
+    });
+
+    const reports: ReportDoc[] = (rawDocs ?? []).map((d: Record<string, unknown>) => ({
+      id: d.id as string,
+      slug: d.slug as string,
+      title: d.title as string,
+      description: (d.description as string) ?? null,
+      report_type: (d.report_type as string) ?? null,
+      report_period_start: (d.report_period_start as string) ?? null,
+      report_period_end: (d.report_period_end as string) ?? null,
+      created_at: d.created_at as string,
+    }));
+
+    const currentUser = {
+      id: user.id,
+      email: user.email ?? '',
+      name: getDisplayName({ email: user.email, metadata: user.user_metadata ?? null }),
+    };
+
+    return (
+      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+        <Navbar isAdmin={isAdmin} userId={user.id} />
+        <Container maxWidth="lg" sx={{ py: 4 }}>
+          <Breadcrumbs sx={{ mb: 3 }}>
+            <Link href="/" style={{ textDecoration: 'none' }}>
+              <Button size="small" color="inherit" sx={{ textTransform: 'none' }}>Dashboard</Button>
+            </Link>
+            <Link href={`/${companySlug}`} style={{ textDecoration: 'none' }}>
+              <Button size="small" color="inherit" sx={{ textTransform: 'none' }}>
+                {resolved.companyName}
+              </Button>
+            </Link>
+            <Typography color="text.primary" fontWeight={600}>{project.name}</Typography>
+          </Breadcrumbs>
+
+          <ProjectDetail
+            project={project}
+            companies={companies}
+            currentUser={currentUser}
+            isAdmin={isAdmin}
+          />
+
+          <ProjectTabs
+            folderId={resolved.folderId}
+            projectStartAt={f.started_at ?? null}
+            initialTasks={tasks}
+            roadmapItems={roadmapItems}
+            reports={reports}
+            initialSpec={f.tech_spec as Record<string, string> | null ?? null}
+            isAdmin={isAdmin}
+            currentUser={currentUser}
+          />
+        </Container>
+      </Box>
+    );
+  }
+
+  // ── Nested folder view ────────────────────────────────────────────────────
   if (resolved.kind === 'folder') {
     const adminClient = await createAdminClient();
 
@@ -61,7 +202,7 @@ export default async function SpacePathPage({
     const base = `/${companySlug}`;
     const [{ data: subFolders }, { data: docs }] = await Promise.all([
       adminClient.from('folders').select('id, name, slug, icon, color').eq('parent_id', resolved.folderId).order('name'),
-      adminClient.from('documents').select('id, slug, title, doc_type').eq('folder_id', resolved.folderId).order('title'),
+      adminClient.from('documents').select('id, slug, title, doc_type').eq('folder_id', resolved.folderId).eq('doc_type', 'md').order('title'),
     ]);
 
     const breadcrumbsWithoutCurrent = resolved.breadcrumbs.slice(0, -1);
@@ -110,14 +251,7 @@ export default async function SpacePathPage({
                         <CardActionArea component={Link} href={href}>
                           <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                             <DescriptionIcon sx={{ color: 'text.secondary', flexShrink: 0 }} />
-                            <Box sx={{ minWidth: 0 }}>
-                              <Typography fontWeight={600} noWrap>{doc.title}</Typography>
-                              {doc.doc_type && doc.doc_type !== 'md' && (
-                                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
-                                  {doc.doc_type}
-                                </Typography>
-                              )}
-                            </Box>
+                            <Typography fontWeight={600} noWrap>{doc.title}</Typography>
                           </CardContent>
                         </CardActionArea>
                       </Card>
