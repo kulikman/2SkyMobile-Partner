@@ -188,28 +188,13 @@ export function ReportList({
                     </Typography>
                   )}
                 </Box>
-                <Stack direction="row" spacing={0.5} alignItems="center" flexShrink={0}>
-                  {report.report_type && (
-                    <Chip
-                      label={reportTypeLabels[report.report_type] ?? report.report_type}
-                      size="small"
-                      variant="outlined"
-                    />
-                  )}
-                  {report.report_period_start && report.report_period_end && (
-                    <Chip
-                      label={`${new Date(report.report_period_start).toLocaleDateString('en-US')} — ${new Date(report.report_period_end).toLocaleDateString('en-US')}`}
-                      size="small"
-                      variant="outlined"
-                    />
-                  )}
-                  <Chip
-                    label={new Date(report.created_at).toLocaleDateString('en-US')}
-                    size="small"
-                    variant="outlined"
-                    color="default"
-                  />
-                </Stack>
+                <Chip
+                  label={new Date(report.created_at).toLocaleDateString('en-US')}
+                  size="small"
+                  variant="outlined"
+                  color="default"
+                  sx={{ flexShrink: 0 }}
+                />
               </Stack>
             </Paper>
           ))}
