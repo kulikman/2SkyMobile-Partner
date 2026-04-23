@@ -26,7 +26,7 @@ export default async function HomePage() {
 
   const { data: companiesData } = await adminClient
     .from("companies")
-    .select("id, name, slug, color, logo_url")
+    .select("id, name, slug, logo_url")
     .order("name");
 
   const companies: CompanyForDashboard[] = (companiesData ?? []).map((c) => ({
@@ -34,8 +34,7 @@ export default async function HomePage() {
     name: c.name,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     slug: (c as any).slug ?? null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    color: (c as any).color ?? null,
+    color: null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     logo_url: (c as any).logo_url ?? null,
   }));
