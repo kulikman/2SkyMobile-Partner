@@ -38,6 +38,17 @@ export default async function ProjectPage({
 
   const adminClient = await createAdminClient();
 
+  // Redirect to canonical /{company}/{folder} URL when slugs are available
+  if (folder.company_id) {
+    const { data: company } = await adminClient
+      .from('companies').select('slug').eq('id', folder.company_id).single();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const folderSlug = (folder as any).slug ?? null;
+    if (company?.slug && folderSlug) {
+      redirect(`/${company.slug}/${folderSlug}`);
+    }
+  }
+
   if (!isAdmin) {
     if (!folder.company_id) notFound();
     const { data: membership } = await adminClient
