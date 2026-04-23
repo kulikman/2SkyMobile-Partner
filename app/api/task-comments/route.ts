@@ -4,24 +4,43 @@ import { getDisplayName } from '@/lib/user-display';
 
 export async function GET(req: NextRequest) {
   const taskId = req.nextUrl.searchParams.get('taskId');
-  if (!taskId) return NextResponse.json({ error: 'taskId is required' }, { status: 400 });
+  const folderId = req.nextUrl.searchParams.get('folderId');
+  if (!taskId && !folderId) return NextResponse.json({ error: 'taskId or folderId is required' }, { status: 400 });
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // task documents share the same UUID — document_id = old task_id
+  if (taskId) {
+    // task documents share the same UUID — document_id = old task_id
+    const { data, error } = await supabase
+      .from('comments')
+      .select('*')
+      .eq('document_id', taskId)
+      .order('created_at', { ascending: true });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json((data ?? []).map((c) => ({ ...c, task_id: c.document_id })));
+  }
+
+  // folderId: get all task IDs for this folder, then all their comments
+  const adminClient = await createAdminClient();
+  const { data: tasks } = await adminClient
+    .from('documents')
+    .select('id')
+    .eq('folder_id', folderId!)
+    .eq('doc_type', 'task');
+
+  if (!tasks?.length) return NextResponse.json([]);
+
+  const taskIds = tasks.map((t) => t.id);
   const { data, error } = await supabase
     .from('comments')
     .select('*')
-    .eq('document_id', taskId)
+    .in('document_id', taskIds)
     .order('created_at', { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  // Map document_id → task_id so UI doesn't need changes
-  const mapped = (data ?? []).map((c) => ({ ...c, task_id: c.document_id }));
-  return NextResponse.json(mapped);
+  return NextResponse.json((data ?? []).map((c) => ({ ...c, task_id: c.document_id })));
 }
 
 export async function POST(req: NextRequest) {

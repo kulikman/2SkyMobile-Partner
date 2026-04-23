@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -27,6 +27,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import ChatBubbleIcon from '@mui/icons-material/ChatBubble';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -36,6 +37,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import SendIcon from '@mui/icons-material/Send';
 import UploadIcon from '@mui/icons-material/Upload';
 import { createClient } from '@/lib/supabase/client';
 
@@ -77,6 +79,17 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 // ── Types ────────────────────────────────────────────────────────────────────
+
+type TicketComment = {
+  id: string;
+  ticket_id: string;
+  user_id: string | null;
+  author_name: string;
+  content: string;
+  created_at: string;
+};
+
+type CurrentUser = { id: string; email: string; name: string };
 
 type Ticket = {
   id: string;
@@ -143,11 +156,15 @@ function TypeChip({ type }: { type: string | null }) {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: boolean }) {
+export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: string; isAdmin: boolean; currentUser: CurrentUser }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedTicket, setExpandedTicket] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [ticketComments, setTicketComments] = useState<Map<string, TicketComment[]>>(new Map());
+  const [commentDraft, setCommentDraft] = useState<Map<string, string>>(new Map());
+  const [sendingComment, setSendingComment] = useState<Set<string>>(new Set());
+  const chatEndRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
 
   // Filters
   const [filterModule,   setFilterModule]   = useState('');
@@ -170,7 +187,48 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
       .then((r) => r.json())
       .then((d) => { setTickets(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
+    fetch(`/api/ticket-comments?folderId=${folderId}`)
+      .then((r) => r.json())
+      .then((all) => {
+        if (!Array.isArray(all)) return;
+        const map = new Map<string, TicketComment[]>();
+        all.forEach((c: TicketComment) => {
+          const list = map.get(c.ticket_id) ?? [];
+          list.push(c);
+          map.set(c.ticket_id, list);
+        });
+        setTicketComments(map);
+      })
+      .catch(() => {});
   }, [folderId]);
+
+  // scroll chat to bottom when ticket expands or new comment
+  useEffect(() => {
+    if (expandedTicket) {
+      chatEndRefs.current.get(expandedTicket)?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [expandedTicket, ticketComments]);
+
+  const sendComment = useCallback(async (ticketId: string) => {
+    const message = (commentDraft.get(ticketId) ?? '').trim();
+    if (!message) return;
+    setSendingComment((prev) => new Set(prev).add(ticketId));
+    const res = await fetch('/api/ticket-comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket_id: ticketId, content: message }),
+    });
+    if (res.ok) {
+      const data: TicketComment = await res.json();
+      setTicketComments((prev) => {
+        const next = new Map(prev);
+        next.set(ticketId, [...(prev.get(ticketId) ?? []), data]);
+        return next;
+      });
+      setCommentDraft((prev) => { const next = new Map(prev); next.set(ticketId, ''); return next; });
+    }
+    setSendingComment((prev) => { const next = new Set(prev); next.delete(ticketId); return next; });
+  }, [commentDraft]);
 
   // ── Form helpers ──────────────────────────────────────────────────────────
 
@@ -439,7 +497,8 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
                     ...(!isCollapsed ? items.flatMap((ticket) => {
                       const sm = statusMeta(ticket.status);
                       const isOpen = expandedTicket === ticket.id;
-                      const hasDetails = ticket.description || ticket.url || ticket.screenshot_path || ticket.comments;
+                      const threadComments = ticketComments.get(ticket.id) ?? [];
+                      const hasComments = threadComments.length > 0;
 
                       return [
                         <TableRow
@@ -449,15 +508,15 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
                         >
                           {/* Expand toggle */}
                           <TableCell sx={{ px: 1, py: 0.5 }}>
-                            {hasDetails && (
-                              <IconButton
-                                size="small"
-                                onClick={() => setExpandedTicket(isOpen ? null : ticket.id)}
-                                sx={{ color: 'text.disabled', p: 0.25 }}
-                              >
-                                <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />
-                              </IconButton>
-                            )}
+                            <IconButton
+                              size="small"
+                              onClick={() => setExpandedTicket(isOpen ? null : ticket.id)}
+                              sx={{ color: hasComments ? 'primary.main' : 'text.disabled', p: 0.25 }}
+                            >
+                              {hasComments
+                                ? <ChatBubbleIcon sx={{ fontSize: 15 }} />
+                                : <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />}
+                            </IconButton>
                           </TableCell>
 
                           {/* Title */}
@@ -552,30 +611,16 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
                         </TableRow>,
 
                         /* Expanded detail row */
-                        isOpen && hasDetails ? (
+                        isOpen ? (
                           <TableRow key={`${ticket.id}-detail`}>
-                            <TableCell colSpan={6} sx={{ pb: 2, pt: 0, bgcolor: 'grey.50' }}>
+                            <TableCell colSpan={6} sx={{ pb: 2, pt: 0, bgcolor: '#f8fafc' }}>
                               <Box sx={{ px: 2 }}>
                                 <Collapse in={isOpen}>
-                                  <Stack spacing={1} pt={1.5}>
+                                  <Stack spacing={1.5} pt={1.5}>
                                     {ticket.description && (
                                       <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>
                                         {ticket.description}
                                       </Typography>
-                                    )}
-                                    {ticket.comments && (
-                                      <>
-                                        <Divider />
-                                        <Box>
-                                          <Typography variant="caption" fontWeight={700} color="text.secondary"
-                                            sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', mb: 0.5 }}>
-                                            Comments
-                                          </Typography>
-                                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                                            {ticket.comments}
-                                          </Typography>
-                                        </Box>
-                                      </>
                                     )}
                                     <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
                                       {ticket.url && (
@@ -596,6 +641,72 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
                                         </Button>
                                       )}
                                     </Stack>
+
+                                    <Divider />
+
+                                    {/* Chat thread */}
+                                    <Box>
+                                      <Typography variant="caption" fontWeight={700} color="text.secondary"
+                                        sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', mb: 1 }}>
+                                        Comments
+                                      </Typography>
+                                      {threadComments.length === 0 ? (
+                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                                          No comments yet. Be the first!
+                                        </Typography>
+                                      ) : (
+                                        <Stack spacing={1.5} sx={{ mb: 1.5, maxHeight: 280, overflowY: 'auto', pr: 0.5 }}>
+                                          {threadComments.map((c) => {
+                                            const isMe = c.user_id === currentUser.id;
+                                            return (
+                                              <Stack key={c.id} direction="row" justifyContent={isMe ? 'flex-end' : 'flex-start'}>
+                                                <Box sx={{
+                                                  maxWidth: '75%',
+                                                  bgcolor: isMe ? '#1565c0' : 'white',
+                                                  color: isMe ? 'white' : 'text.primary',
+                                                  border: isMe ? 'none' : '1px solid',
+                                                  borderColor: 'divider',
+                                                  borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                                                  px: 1.5, py: 1,
+                                                }}>
+                                                  {!isMe && (
+                                                    <Typography variant="caption" fontWeight={700}
+                                                      sx={{ display: 'block', mb: 0.25, opacity: 0.7 }}>
+                                                      {c.author_name}
+                                                    </Typography>
+                                                  )}
+                                                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                                                    {c.content}
+                                                  </Typography>
+                                                  <Typography variant="caption"
+                                                    sx={{ display: 'block', mt: 0.5, opacity: 0.6, fontSize: 10 }}>
+                                                    {new Date(c.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                  </Typography>
+                                                </Box>
+                                              </Stack>
+                                            );
+                                          })}
+                                          <div ref={(el) => { chatEndRefs.current.set(ticket.id, el); }} />
+                                        </Stack>
+                                      )}
+                                      <Stack direction="row" spacing={1} alignItems="flex-end">
+                                        <TextField
+                                          size="small" fullWidth multiline maxRows={3}
+                                          placeholder="Write a comment…"
+                                          value={commentDraft.get(ticket.id) ?? ''}
+                                          onChange={(e) => setCommentDraft((prev) => new Map(prev).set(ticket.id, e.target.value))}
+                                          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendComment(ticket.id); } }}
+                                        />
+                                        <IconButton color="primary"
+                                          disabled={sendingComment.has(ticket.id) || !(commentDraft.get(ticket.id) ?? '').trim()}
+                                          onClick={() => sendComment(ticket.id)}
+                                          sx={{ flexShrink: 0 }}>
+                                          {sendingComment.has(ticket.id)
+                                            ? <CircularProgress size={18} />
+                                            : <SendIcon />}
+                                        </IconButton>
+                                      </Stack>
+                                    </Box>
                                   </Stack>
                                 </Collapse>
                               </Box>
@@ -608,20 +719,21 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
                 })}
 
                 {/* Ungrouped rows (no known priority) */}
-                {ungrouped.length > 0 && ungrouped.map((ticket) => {
+                {ungrouped.length > 0 && ungrouped.flatMap((ticket) => {
                   const sm = statusMeta(ticket.status);
                   const isOpen = expandedTicket === ticket.id;
-                  const hasDetails = ticket.description || ticket.url || ticket.screenshot_path || ticket.comments;
-                  return (
-                    <TableRow key={ticket.id} hover>
+                  const threadComments = ticketComments.get(ticket.id) ?? [];
+                  const hasComments = threadComments.length > 0;
+                  return [
+                    <TableRow key={ticket.id} hover sx={{ '& td': { borderBottom: isOpen ? 'none' : undefined } }}>
                       <TableCell sx={{ px: 1, py: 0.5 }}>
-                        {hasDetails && (
-                          <IconButton size="small"
-                            onClick={() => setExpandedTicket(isOpen ? null : ticket.id)}
-                            sx={{ color: 'text.disabled', p: 0.25 }}>
-                            <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />
-                          </IconButton>
-                        )}
+                        <IconButton size="small"
+                          onClick={() => setExpandedTicket(isOpen ? null : ticket.id)}
+                          sx={{ color: hasComments ? 'primary.main' : 'text.disabled', p: 0.25 }}>
+                          {hasComments
+                            ? <ChatBubbleIcon sx={{ fontSize: 15 }} />
+                            : <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />}
+                        </IconButton>
                       </TableCell>
                       <TableCell sx={{ py: 1 }}>
                         <Typography variant="body2" fontWeight={600} noWrap>{ticket.title}</Typography>
@@ -632,16 +744,11 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
                         {ticket.module && <Typography variant="caption" fontWeight={500} color="text.secondary" noWrap>{ticket.module}</Typography>}
                       </TableCell>
                       <TableCell sx={{ py: 1 }} onClick={(e) => e.stopPropagation()}>
-                        <Select
-                          value={ticket.status}
-                          onChange={(e) => updateStatus(ticket.id, e.target.value)}
+                        <Select value={ticket.status} onChange={(e) => updateStatus(ticket.id, e.target.value)}
                           size="small"
-                          sx={{
-                            fontSize: 12, fontWeight: 600, height: 28, color: sm.color,
+                          sx={{ fontSize: 12, fontWeight: 600, height: 28, color: sm.color,
                             '& .MuiOutlinedInput-notchedOutline': { borderColor: sm.color + '55' },
-                            '& .MuiSelect-icon': { color: sm.color },
-                          }}
-                        >
+                            '& .MuiSelect-icon': { color: sm.color } }}>
                           {STATUSES.map((s) => <MenuItem key={s.value} value={s.value} sx={{ fontSize: 12 }}>{s.label}</MenuItem>)}
                         </Select>
                       </TableCell>
@@ -651,8 +758,106 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
                           {isAdmin && <IconButton size="small" color="error" onClick={() => deleteTicket(ticket.id)}><DeleteIcon sx={{ fontSize: 15 }} /></IconButton>}
                         </Stack>
                       </TableCell>
-                    </TableRow>
-                  );
+                    </TableRow>,
+                    isOpen ? (
+                      <TableRow key={`${ticket.id}-detail`}>
+                        <TableCell colSpan={6} sx={{ pb: 2, pt: 0, bgcolor: '#f8fafc' }}>
+                          <Box sx={{ px: 2 }}>
+                            <Collapse in={isOpen}>
+                              <Stack spacing={1.5} pt={1.5}>
+                                {ticket.description && (
+                                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>
+                                    {ticket.description}
+                                  </Typography>
+                                )}
+                                {(ticket.url || ticket.screenshot_path) && (
+                                  <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
+                                    {ticket.url && (
+                                      <Stack direction="row" spacing={0.5} alignItems="center">
+                                        <LinkIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                                        <Typography variant="body2" component="a" href={ticket.url}
+                                          target="_blank" rel="noopener noreferrer"
+                                          sx={{ color: 'primary.main', wordBreak: 'break-all' }}>
+                                          {ticket.url}
+                                        </Typography>
+                                      </Stack>
+                                    )}
+                                    {ticket.screenshot_path && (
+                                      <Button size="small" variant="outlined" startIcon={<AttachFileIcon />}
+                                        onClick={() => openScreenshot(ticket.screenshot_path!)}
+                                        sx={{ alignSelf: 'flex-start' }}>
+                                        View screenshot
+                                      </Button>
+                                    )}
+                                  </Stack>
+                                )}
+                                <Divider />
+                                <Box>
+                                  <Typography variant="caption" fontWeight={700} color="text.secondary"
+                                    sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', mb: 1 }}>
+                                    Comments
+                                  </Typography>
+                                  {threadComments.length === 0 ? (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                                      No comments yet. Be the first!
+                                    </Typography>
+                                  ) : (
+                                    <Stack spacing={1.5} sx={{ mb: 1.5, maxHeight: 280, overflowY: 'auto', pr: 0.5 }}>
+                                      {threadComments.map((c) => {
+                                        const isMe = c.user_id === currentUser.id;
+                                        return (
+                                          <Stack key={c.id} direction="row" justifyContent={isMe ? 'flex-end' : 'flex-start'}>
+                                            <Box sx={{
+                                              maxWidth: '75%',
+                                              bgcolor: isMe ? '#1565c0' : 'white',
+                                              color: isMe ? 'white' : 'text.primary',
+                                              border: isMe ? 'none' : '1px solid',
+                                              borderColor: 'divider',
+                                              borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                                              px: 1.5, py: 1,
+                                            }}>
+                                              {!isMe && (
+                                                <Typography variant="caption" fontWeight={700}
+                                                  sx={{ display: 'block', mb: 0.25, opacity: 0.7 }}>
+                                                  {c.author_name}
+                                                </Typography>
+                                              )}
+                                              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                                                {c.content}
+                                              </Typography>
+                                              <Typography variant="caption"
+                                                sx={{ display: 'block', mt: 0.5, opacity: 0.6, fontSize: 10 }}>
+                                                {new Date(c.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                              </Typography>
+                                            </Box>
+                                          </Stack>
+                                        );
+                                      })}
+                                      <div ref={(el) => { chatEndRefs.current.set(ticket.id, el); }} />
+                                    </Stack>
+                                  )}
+                                  <Stack direction="row" spacing={1} alignItems="flex-end">
+                                    <TextField size="small" fullWidth multiline maxRows={3}
+                                      placeholder="Write a comment…"
+                                      value={commentDraft.get(ticket.id) ?? ''}
+                                      onChange={(e) => setCommentDraft((prev) => new Map(prev).set(ticket.id, e.target.value))}
+                                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendComment(ticket.id); } }}
+                                    />
+                                    <IconButton color="primary"
+                                      disabled={sendingComment.has(ticket.id) || !(commentDraft.get(ticket.id) ?? '').trim()}
+                                      onClick={() => sendComment(ticket.id)}
+                                      sx={{ flexShrink: 0 }}>
+                                      {sendingComment.has(ticket.id) ? <CircularProgress size={18} /> : <SendIcon />}
+                                    </IconButton>
+                                  </Stack>
+                                </Box>
+                              </Stack>
+                            </Collapse>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ) : null,
+                  ];
                 })}
               </TableBody>
             </Table>

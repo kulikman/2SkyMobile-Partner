@@ -26,11 +26,11 @@ import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import ChatBubbleIcon from '@mui/icons-material/ChatBubble';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
-import ReplyIcon from '@mui/icons-material/Reply';
 import SendIcon from '@mui/icons-material/Send';
 import UploadIcon from '@mui/icons-material/Upload';
 import { TaskImportDialog } from '@/components/TaskImportDialog';
@@ -110,8 +110,8 @@ function StatusChip({ status, onChange }: { status: string; onChange?: (s: strin
   );
 }
 
-function TaskRow({ task, isAdmin, onStatusChange, onOpenComments }:
-  { task: Task; isAdmin: boolean;
+function TaskRow({ task, isAdmin, hasComments, onStatusChange, onOpenComments }:
+  { task: Task; isAdmin: boolean; hasComments: boolean;
     onStatusChange: (id: string, status: string) => void;
     onOpenComments: (task: Task) => void }) {
 
@@ -167,8 +167,11 @@ function TaskRow({ task, isAdmin, onStatusChange, onOpenComments }:
       </TableCell>
       <TableCell align="center">
         <Tooltip title="Comments">
-          <IconButton size="small" onClick={() => onOpenComments(task)}>
-            <ChatBubbleOutlineIcon fontSize="small" />
+          <IconButton size="small" onClick={() => onOpenComments(task)}
+            sx={{ color: hasComments ? 'primary.main' : 'text.disabled' }}>
+            {hasComments
+              ? <ChatBubbleIcon sx={{ fontSize: 16 }} />
+              : <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />}
           </IconButton>
         </Tooltip>
       </TableCell>
@@ -272,13 +275,16 @@ function TimelineView({ tasks }: { tasks: Task[] }) {
 
 // ── Comments drawer ─────────────────────────────────────────────────────────
 
-function CommentsDrawer({ task, onClose }:
-  { task: Task | null; onClose: () => void }) {
+function CommentsDrawer({ task, currentUser, onClose, onCommentAdded }:
+  { task: Task | null; currentUser: CurrentUser; onClose: () => void;
+    onCommentAdded: (taskId: string, comment: TaskComment) => void }) {
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [text, setText] = useState('');
-  const [replyTo, setReplyTo] = useState<TaskComment | null>(null);
   const [sending, setSending] = useState(false);
+  const chatEndRef = useCallback((el: HTMLDivElement | null) => {
+    el?.scrollIntoView({ behavior: 'smooth' });
+  }, [comments]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadComments = useCallback(async (taskId: string) => {
     const res = await fetch(`/api/task-comments?taskId=${taskId}`);
@@ -287,13 +293,11 @@ function CommentsDrawer({ task, onClose }:
     setLoaded(true);
   }, []);
 
-  // Reset + load when task changes
   useEffect(() => {
     if (!task) return;
     setComments([]);
     setLoaded(false);
     setText('');
-    setReplyTo(null);
     loadComments(task.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id]);
@@ -306,19 +310,16 @@ function CommentsDrawer({ task, onClose }:
     const res = await fetch('/api/task-comments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ task_id: task!.id, content: text.trim(), parent_id: replyTo?.id ?? null }),
+      body: JSON.stringify({ task_id: task!.id, content: text.trim() }),
     });
     if (res.ok) {
       const c = await res.json();
       setComments((prev) => [...prev, c]);
+      onCommentAdded(task!.id, c);
       setText('');
-      setReplyTo(null);
     }
     setSending(false);
   }
-
-  const roots = comments.filter((c) => !c.parent_id);
-  const replies = (parentId: string) => comments.filter((c) => c.parent_id === parentId);
 
   return (
     <Drawer anchor="right" open={!!task} onClose={onClose}
@@ -335,36 +336,48 @@ function CommentsDrawer({ task, onClose }:
       <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 1.5 }}>
         {!loaded ? (
           <Box display="flex" justifyContent="center" pt={4}><CircularProgress size={24} /></Box>
-        ) : roots.length === 0 ? (
+        ) : comments.length === 0 ? (
           <Typography variant="body2" color="text.secondary" textAlign="center" mt={4}>
             No comments yet. Be the first!
           </Typography>
         ) : (
-          <Stack spacing={2}>
-            {roots.map((root) => (
-              <Box key={root.id}>
-                <CommentBubble comment={root} onReply={() => setReplyTo(root)} />
-                {replies(root.id).map((r) => (
-                  <Box key={r.id} sx={{ ml: 3, mt: 1 }}>
-                    <CommentBubble comment={r} onReply={() => setReplyTo(root)} />
+          <Stack spacing={1.5}>
+            {comments.map((c) => {
+              const isMe = c.user_id === currentUser.id;
+              return (
+                <Stack key={c.id} direction="row" justifyContent={isMe ? 'flex-end' : 'flex-start'}>
+                  <Box sx={{
+                    maxWidth: '75%',
+                    bgcolor: isMe ? '#1565c0' : 'white',
+                    color: isMe ? 'white' : 'text.primary',
+                    border: isMe ? 'none' : '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                    px: 1.5, py: 1,
+                  }}>
+                    {!isMe && (
+                      <Typography variant="caption" fontWeight={700}
+                        sx={{ display: 'block', mb: 0.25, opacity: 0.7 }}>
+                        {c.author_name}
+                      </Typography>
+                    )}
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                      {c.content}
+                    </Typography>
+                    <Typography variant="caption"
+                      sx={{ display: 'block', mt: 0.5, opacity: 0.6, fontSize: 10 }}>
+                      {new Date(c.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </Typography>
                   </Box>
-                ))}
-              </Box>
-            ))}
+                </Stack>
+              );
+            })}
+            <div ref={chatEndRef} />
           </Stack>
         )}
       </Box>
 
       <Box sx={{ px: 2, py: 1.5, borderTop: 1, borderColor: 'divider' }}>
-        {replyTo && (
-          <Stack direction="row" alignItems="center" justifyContent="space-between"
-            sx={{ mb: 1, px: 1.5, py: 0.75, bgcolor: 'action.hover', borderRadius: 1.5 }}>
-            <Typography variant="caption" color="text.secondary">
-              Replying to <strong>{replyTo.author_name}</strong>
-            </Typography>
-            <IconButton size="small" onClick={() => setReplyTo(null)}><CloseIcon fontSize="small" /></IconButton>
-          </Stack>
-        )}
         <Stack direction="row" spacing={1}>
           <TextField
             value={text} onChange={(e) => setText(e.target.value)}
@@ -380,27 +393,6 @@ function CommentsDrawer({ task, onClose }:
   );
 }
 
-function CommentBubble({ comment, onReply }: { comment: TaskComment; onReply: () => void }) {
-  return (
-    <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>
-        <Typography variant="caption" fontWeight={700}>{comment.author_name}</Typography>
-        <Stack direction="row" spacing={0.5} alignItems="center">
-          <Typography variant="caption" color="text.disabled">
-            {new Date(comment.created_at).toLocaleDateString()}
-          </Typography>
-          {!comment.parent_id && (
-            <IconButton size="small" onClick={onReply} sx={{ p: 0.25 }}>
-              <ReplyIcon sx={{ fontSize: 14 }} />
-            </IconButton>
-          )}
-        </Stack>
-      </Stack>
-      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{comment.content}</Typography>
-    </Box>
-  );
-}
-
 // ── Main component ───────────────────────────────────────────────────────────
 
 type Props = {
@@ -411,7 +403,7 @@ type Props = {
   currentUser: CurrentUser;
 };
 
-export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin }: Props) {
+export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, currentUser }: Props) {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
 
@@ -420,10 +412,27 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin }: P
   const [view, setView] = useState<'table' | 'timeline'>('table');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [commentCounts, setCommentCounts] = useState<Map<string, number>>(new Map());
   const [importOpen, setImportOpen] = useState(false);
   const [filterRole, setFilterRole] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [importError, setImportError] = useState('');
+
+  useEffect(() => {
+    fetch(`/api/task-comments?folderId=${folderId}`)
+      .then((r) => r.json())
+      .then((all) => {
+        if (!Array.isArray(all)) return;
+        const map = new Map<string, number>();
+        all.forEach((c: TaskComment) => { map.set(c.task_id, (map.get(c.task_id) ?? 0) + 1); });
+        setCommentCounts(map);
+      })
+      .catch(() => {});
+  }, [folderId]);
+
+  function handleCommentAdded(taskId: string, _comment: TaskComment) {
+    setCommentCounts((prev) => new Map(prev).set(taskId, (prev.get(taskId) ?? 0) + 1));
+  }
 
   function toggleGroup(label: string) {
     setCollapsedGroups((prev) => {
@@ -546,12 +555,14 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin }: P
                       open={isOpen} onToggle={() => toggleGroup(group)} />,
                     ...(isOpen ? groupTasks.map((t) => (
                       <TaskRow key={t.id} task={t} isAdmin={isAdmin}
+                        hasComments={(commentCounts.get(t.id) ?? 0) > 0}
                         onStatusChange={handleStatusChange} onOpenComments={setActiveTask} />
                     )) : []),
                   ];
                 })}
                 {ungrouped.map((t) => (
                   <TaskRow key={t.id} task={t} isAdmin={isAdmin}
+                    hasComments={(commentCounts.get(t.id) ?? 0) > 0}
                     onStatusChange={handleStatusChange} onOpenComments={setActiveTask} />
                 ))}
               </TableBody>
@@ -577,7 +588,7 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin }: P
         </Paper>
       )}
 
-      <CommentsDrawer task={activeTask} onClose={() => setActiveTask(null)} />
+      <CommentsDrawer task={activeTask} currentUser={currentUser} onClose={() => setActiveTask(null)} onCommentAdded={handleCommentAdded} />
 
       {importError && (
         <Alert severity="error" onClose={() => setImportError('')} sx={{ mt: 2 }}>

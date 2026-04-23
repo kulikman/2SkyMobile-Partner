@@ -109,7 +109,7 @@ export function ProjectTabs({
       {/* 6 — Issues */}
       <Box sx={{ display: tab === 6 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
-          <IssuesView folderId={folderId} isAdmin={isAdmin} />
+          <IssuesView folderId={folderId} isAdmin={isAdmin} currentUser={currentUser} />
         </Paper>
       </Box>
     </Box>
