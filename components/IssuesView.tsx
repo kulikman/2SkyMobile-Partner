@@ -166,11 +166,6 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
   const [sendingComment, setSendingComment] = useState<Set<string>>(new Set());
   const chatEndRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
 
-  // Filters
-  const [filterModule,   setFilterModule]   = useState('');
-  const [filterType,     setFilterType]     = useState('');
-  const [filterPriority, setFilterPriority] = useState('');
-  const [filterStatus,   setFilterStatus]   = useState('');
 
   // Create / Edit dialog
   const [dialogOpen,  setDialogOpen]  = useState(false);
@@ -373,15 +368,7 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
 
   // ── Filtered list ─────────────────────────────────────────────────────────
 
-  const filtered = tickets.filter((t) => {
-    if (filterModule   && t.module   !== filterModule)   return false;
-    if (filterType     && t.type     !== filterType)     return false;
-    if (filterPriority && t.priority !== filterPriority) return false;
-    if (filterStatus   && t.status   !== filterStatus)   return false;
-    return true;
-  });
-
-  const allModules = Array.from(new Set(tickets.map((t) => t.module).filter(Boolean))) as string[];
+  const filtered = tickets;
 
   // Group by priority
   const groups = PRIORITIES.map((p) => ({
@@ -405,36 +392,11 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
         </Button>
       </Stack>
 
-      {/* Filters */}
-      {tickets.length > 0 && (
-        <Stack direction="row" spacing={1} mb={2} flexWrap="wrap" useFlexGap>
-          <Select value={filterModule} onChange={(e) => setFilterModule(e.target.value)}
-            displayEmpty size="small" sx={{ fontSize: 13, height: 32, minWidth: 160 }}>
-            <MenuItem value=""><em>All modules</em></MenuItem>
-            {allModules.map((m) => <MenuItem key={m} value={m} sx={{ fontSize: 13 }}>{m}</MenuItem>)}
-          </Select>
-          <Select value={filterType} onChange={(e) => setFilterType(e.target.value)}
-            displayEmpty size="small" sx={{ fontSize: 13, height: 32 }}>
-            <MenuItem value=""><em>All types</em></MenuItem>
-            {TYPES.map((t) => <MenuItem key={t} value={t} sx={{ fontSize: 13 }}>{t}</MenuItem>)}
-          </Select>
-          <Select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}
-            displayEmpty size="small" sx={{ fontSize: 13, height: 32 }}>
-            <MenuItem value=""><em>All priorities</em></MenuItem>
-            {PRIORITIES.map((p) => <MenuItem key={p.value} value={p.value} sx={{ fontSize: 13 }}>{p.label}</MenuItem>)}
-          </Select>
-          <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-            displayEmpty size="small" sx={{ fontSize: 13, height: 32 }}>
-            <MenuItem value=""><em>All statuses</em></MenuItem>
-            {STATUSES.map((s) => <MenuItem key={s.value} value={s.value} sx={{ fontSize: 13 }}>{s.label}</MenuItem>)}
-          </Select>
-        </Stack>
-      )}
 
       {/* Table */}
       {filtered.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          {tickets.length === 0 ? 'No issues reported yet.' : 'No issues match the filters.'}
+          No issues reported yet.
         </Typography>
       ) : (
         <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>

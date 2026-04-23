@@ -36,8 +36,6 @@ export function MeetingsView({ folderId, isAdmin }: { folderId: string; isAdmin:
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [bookOpen, setBookOpen] = useState(false);
-
   // Create / Edit dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Meeting | null>(null);
@@ -117,9 +115,6 @@ export function MeetingsView({ folderId, isAdmin }: { folderId: string; isAdmin:
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h6" fontWeight={700}>Meetings</Typography>
         <Stack direction="row" spacing={1}>
-          <Button size="small" variant="outlined" onClick={() => setBookOpen(true)}>
-            Book a meeting
-          </Button>
           {isAdmin && (
             <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
               Add meeting
@@ -201,25 +196,6 @@ export function MeetingsView({ folderId, isAdmin }: { folderId: string; isAdmin:
           })}
         </Stack>
       )}
-
-      {/* Book a meeting — iframe modal */}
-      <Dialog open={bookOpen} onClose={() => setBookOpen(false)} maxWidth="md" fullWidth
-        PaperProps={{ sx: { height: '90vh' } }}>
-        <DialogTitle fontWeight={700} sx={{ pb: 1 }}>
-          Book a meeting
-          <IconButton size="small" onClick={() => setBookOpen(false)} sx={{ position: 'absolute', right: 12, top: 12 }}>
-            ✕
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
-          <Box
-            component="iframe"
-            src="https://crm.2skymobile.com/book"
-            sx={{ width: '100%', height: '100%', border: 0 }}
-            title="Book a meeting"
-          />
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={dialogOpen} onClose={() => { setDialogOpen(false); setSaveError(''); }} maxWidth="sm" fullWidth>
         <DialogTitle fontWeight={700}>{editTarget ? 'Edit meeting' : 'New meeting'}</DialogTitle>

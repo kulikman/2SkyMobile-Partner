@@ -191,9 +191,7 @@ export function ReportList({
                 <Chip
                   label={new Date(report.created_at).toLocaleDateString('en-US')}
                   size="small"
-                  variant="outlined"
-                  color="default"
-                  sx={{ flexShrink: 0 }}
+                  sx={{ flexShrink: 0, bgcolor: 'transparent', border: 'none', color: 'text.secondary', fontSize: 12 }}
                 />
               </Stack>
             </Paper>
