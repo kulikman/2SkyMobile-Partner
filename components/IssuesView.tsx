@@ -27,10 +27,11 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import LinkIcon from '@mui/icons-material/Link';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
@@ -121,17 +122,20 @@ function priorityMeta(value: string) {
   return PRIORITIES.find((p) => p.value === value) ?? { label: value, color: '#9e9e9e' };
 }
 
-function ColorChip({ label, color }: { label: string; color: string }) {
+function TypeChip({ type }: { type: string | null }) {
+  if (!type) return null;
+  const color = TYPE_COLORS[type] ?? '#9e9e9e';
   return (
     <Chip
-      label={label}
+      label={type}
       size="small"
+      variant="outlined"
       sx={{
-        bgcolor: color + '22',
+        fontSize: 11, fontWeight: 600, height: 22,
+        borderRadius: '999px',
+        borderColor: color + '66',
         color,
-        fontWeight: 600,
-        fontSize: 11,
-        border: `1px solid ${color}44`,
+        bgcolor: color + '11',
       }}
     />
   );
@@ -142,7 +146,8 @@ function ColorChip({ label, color }: { label: string; color: string }) {
 export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: boolean }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expandedTicket, setExpandedTicket] = useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   // Filters
   const [filterModule,   setFilterModule]   = useState('');
@@ -202,6 +207,14 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
 
   function setField<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: val }));
+  }
+
+  function toggleGroup(key: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -312,6 +325,13 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
 
   const allModules = Array.from(new Set(tickets.map((t) => t.module).filter(Boolean))) as string[];
 
+  // Group by priority
+  const groups = PRIORITIES.map((p) => ({
+    priority: p,
+    items: filtered.filter((t) => t.priority === p.value),
+  })).filter((g) => g.items.length > 0);
+  const ungrouped = filtered.filter((t) => !PRIORITIES.find((p) => p.value === t.priority));
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading) return <CircularProgress size={24} />;
@@ -361,202 +381,282 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
       ) : (
         <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
           <TableContainer>
-            <Table size="small">
+            <Table size="small" sx={{ tableLayout: 'fixed' }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 700, width: 32 }} />
-                  <TableCell sx={{ fontWeight: 700 }}>Title</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Module</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Severity</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
-                  <TableCell sx={{ fontWeight: 700, width: 120 }} align="right">Actions</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 36, borderBottom: '1px solid', borderColor: 'divider' }} />
+                  <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}>Issue / Title</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 160, borderBottom: '1px solid', borderColor: 'divider' }}>Type</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 180, borderBottom: '1px solid', borderColor: 'divider' }}>Module</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 180, borderBottom: '1px solid', borderColor: 'divider' }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 96, borderBottom: '1px solid', borderColor: 'divider' }} />
                 </TableRow>
               </TableHead>
+
               <TableBody>
-                {filtered.map((ticket) => {
-                  const sm = statusMeta(ticket.status);
-                  const pm = priorityMeta(ticket.priority);
-                  const isOpen = expanded === ticket.id;
-                  const hasDetails = ticket.description || ticket.url || ticket.screenshot_path || ticket.comments;
-
+                {groups.map(({ priority, items }) => {
+                  const isCollapsed = collapsedGroups.has(priority.value);
                   return [
-                    <TableRow
-                      key={ticket.id}
-                      hover
-                      sx={{ cursor: hasDetails ? 'pointer' : 'default', '& td': { borderBottom: isOpen ? 'none' : undefined } }}
-                      onClick={() => hasDetails && setExpanded(isOpen ? null : ticket.id)}
-                    >
-                      {/* Expand toggle */}
-                      <TableCell sx={{ px: 1 }}>
-                        {hasDetails && (
-                          <ExpandMoreIcon fontSize="small" sx={{
-                            color: 'text.disabled', display: 'block',
-                            transform: isOpen ? 'rotate(180deg)' : 'none',
-                            transition: 'transform 0.2s',
-                          }} />
-                        )}
-                      </TableCell>
-
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={600} sx={{ maxWidth: 260 }} noWrap>
-                          {ticket.title}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {ticket.created_by_email}
-                        </Typography>
-                      </TableCell>
-
-                      <TableCell>
-                        {ticket.module && (
-                          <Chip label={ticket.module} size="small"
-                            sx={{ fontSize: 11, bgcolor: '#9e9e9e22', color: '#616161', border: '1px solid #9e9e9e44', fontWeight: 600 }} />
-                        )}
-                      </TableCell>
-
-                      <TableCell>
-                        {ticket.type && (
-                          <ColorChip label={ticket.type} color={TYPE_COLORS[ticket.type] ?? '#9e9e9e'} />
-                        )}
-                      </TableCell>
-
-                      <TableCell>
-                        <ColorChip label={pm.label} color={pm.color} />
-                      </TableCell>
-
-                      <TableCell>
-                        <Typography variant="caption" fontWeight={600} sx={{ textTransform: 'capitalize', color: 'text.secondary' }}>
-                          {ticket.severity || '—'}
-                        </Typography>
-                      </TableCell>
-
-                      <TableCell>
-                        <ColorChip label={sm.label} color={sm.color} />
-                      </TableCell>
-
-                      <TableCell>
-                        <Typography variant="caption" color="text.secondary">
-                          {new Date(ticket.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </Typography>
-                      </TableCell>
-
-                      {/* Actions */}
-                      <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                        <Stack direction="row" spacing={0.25} justifyContent="flex-end" alignItems="center">
-                          {isAdmin && ticket.status === 'new' && (
-                            <IconButton size="small" title="Take" onClick={() => updateStatus(ticket.id, 'in_progress')}>
-                              <PlayArrowIcon fontSize="small" color="warning" />
-                            </IconButton>
-                          )}
-                          {isAdmin && ticket.status === 'in_progress' && (
-                            <IconButton size="small" title="Mark done" onClick={() => updateStatus(ticket.id, 'ready_for_testing')}>
-                              <TaskAltIcon fontSize="small" color="info" />
-                            </IconButton>
-                          )}
-                          {isAdmin && ticket.status === 'in_progress' && (
-                            <IconButton size="small" title="On hold" onClick={() => updateStatus(ticket.id, 'on_hold')}>
-                              <PauseIcon fontSize="small" color="secondary" />
-                            </IconButton>
-                          )}
-                          {!isAdmin && ticket.status === 'ready_for_testing' && ticket.created_by && (
-                            <IconButton size="small" title="Approve" onClick={() => updateStatus(ticket.id, 'approved')}>
-                              <CheckCircleIcon fontSize="small" color="success" />
-                            </IconButton>
-                          )}
-                          {isAdmin && ticket.status === 'approved' && (
-                            <IconButton size="small" title="Close" onClick={() => updateStatus(ticket.id, 'closed')}>
-                              <TaskAltIcon fontSize="small" />
-                            </IconButton>
-                          )}
-                          {isAdmin && (
-                            <IconButton size="small" onClick={() => openEdit(ticket)}>
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          )}
-                          {isAdmin && (
-                            <IconButton size="small" color="error" onClick={() => deleteTicket(ticket.id)}>
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          )}
+                    /* Group header row */
+                    <TableRow key={`grp-${priority.value}`}>
+                      <TableCell
+                        colSpan={6}
+                        sx={{ p: 0, bgcolor: priority.color }}
+                      >
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          spacing={1}
+                          sx={{ px: 1.5, py: 0.75, cursor: 'pointer' }}
+                          onClick={() => toggleGroup(priority.value)}
+                        >
+                          <KeyboardArrowDownIcon
+                            sx={{
+                              color: 'white', fontSize: 18,
+                              transform: isCollapsed ? 'rotate(-90deg)' : 'none',
+                              transition: 'transform 0.2s',
+                              flexShrink: 0,
+                            }}
+                          />
+                          <Typography sx={{ color: 'white', fontWeight: 700, fontSize: 13, flex: 1 }}>
+                            {priority.label} Priority
+                          </Typography>
+                          <Box sx={{
+                            bgcolor: 'white', borderRadius: '50%',
+                            width: 22, height: 22,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0,
+                          }}>
+                            <Typography sx={{ color: priority.color, fontWeight: 800, fontSize: 11, lineHeight: 1 }}>
+                              {items.length}
+                            </Typography>
+                          </Box>
                         </Stack>
                       </TableCell>
                     </TableRow>,
 
-                    /* Expanded detail row */
-                    isOpen && hasDetails ? (
-                      <TableRow key={`${ticket.id}-detail`}>
-                        <TableCell colSpan={9} sx={{ pb: 2, pt: 0, bgcolor: 'grey.50' }}>
-                          <Box sx={{ px: 1 }}>
-                            <Collapse in={isOpen}>
-                              <Stack spacing={1} pt={1}>
-                                {ticket.description && (
-                                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>
-                                    {ticket.description}
-                                  </Typography>
-                                )}
-                                {ticket.comments && (
-                                  <>
-                                    <Divider />
-                                    <Box>
-                                      <Typography variant="caption" fontWeight={700} color="text.secondary"
-                                        sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', mb: 0.5 }}>
-                                        Comments
+                    /* Issue rows */
+                    ...(!isCollapsed ? items.flatMap((ticket) => {
+                      const sm = statusMeta(ticket.status);
+                      const isOpen = expandedTicket === ticket.id;
+                      const hasDetails = ticket.description || ticket.url || ticket.screenshot_path || ticket.comments;
+
+                      return [
+                        <TableRow
+                          key={ticket.id}
+                          hover
+                          sx={{ '& td': { borderBottom: isOpen ? 'none' : undefined } }}
+                        >
+                          {/* Expand toggle */}
+                          <TableCell sx={{ px: 1, py: 0.5 }}>
+                            {hasDetails && (
+                              <IconButton
+                                size="small"
+                                onClick={() => setExpandedTicket(isOpen ? null : ticket.id)}
+                                sx={{ color: 'text.disabled', p: 0.25 }}
+                              >
+                                <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />
+                              </IconButton>
+                            )}
+                          </TableCell>
+
+                          {/* Title */}
+                          <TableCell sx={{ py: 1 }}>
+                            <Typography variant="body2" fontWeight={600} noWrap>
+                              {ticket.title}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" noWrap>
+                              {ticket.created_by_email}
+                            </Typography>
+                          </TableCell>
+
+                          {/* Type */}
+                          <TableCell sx={{ py: 1 }}>
+                            <TypeChip type={ticket.type} />
+                          </TableCell>
+
+                          {/* Module */}
+                          <TableCell sx={{ py: 1 }}>
+                            {ticket.module && (
+                              <Typography variant="caption" fontWeight={500} color="text.secondary" noWrap>
+                                {ticket.module}
+                              </Typography>
+                            )}
+                          </TableCell>
+
+                          {/* Status — inline select */}
+                          <TableCell sx={{ py: 1 }} onClick={(e) => e.stopPropagation()}>
+                            <Select
+                              value={ticket.status}
+                              onChange={(e) => updateStatus(ticket.id, e.target.value)}
+                              size="small"
+                              sx={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                height: 28,
+                                color: sm.color,
+                                '& .MuiOutlinedInput-notchedOutline': {
+                                  borderColor: sm.color + '55',
+                                },
+                                '& .MuiSelect-icon': { color: sm.color },
+                              }}
+                            >
+                              {STATUSES.map((s) => (
+                                <MenuItem key={s.value} value={s.value} sx={{ fontSize: 12 }}>
+                                  {s.label}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </TableCell>
+
+                          {/* Actions */}
+                          <TableCell align="right" sx={{ py: 0.5 }} onClick={(e) => e.stopPropagation()}>
+                            <Stack direction="row" spacing={0.25} justifyContent="flex-end" alignItems="center">
+                              {isAdmin && ticket.status === 'new' && (
+                                <IconButton size="small" title="Take" onClick={() => updateStatus(ticket.id, 'in_progress')}>
+                                  <PlayArrowIcon sx={{ fontSize: 16, color: '#f57c00' }} />
+                                </IconButton>
+                              )}
+                              {isAdmin && ticket.status === 'in_progress' && (
+                                <IconButton size="small" title="Mark done" onClick={() => updateStatus(ticket.id, 'ready_for_testing')}>
+                                  <TaskAltIcon sx={{ fontSize: 16, color: '#1976d2' }} />
+                                </IconButton>
+                              )}
+                              {isAdmin && ticket.status === 'in_progress' && (
+                                <IconButton size="small" title="On hold" onClick={() => updateStatus(ticket.id, 'on_hold')}>
+                                  <PauseIcon sx={{ fontSize: 16, color: '#7b1fa2' }} />
+                                </IconButton>
+                              )}
+                              {!isAdmin && ticket.status === 'ready_for_testing' && ticket.created_by && (
+                                <IconButton size="small" title="Approve" onClick={() => updateStatus(ticket.id, 'approved')}>
+                                  <CheckCircleIcon sx={{ fontSize: 16, color: '#388e3c' }} />
+                                </IconButton>
+                              )}
+                              {isAdmin && ticket.status === 'approved' && (
+                                <IconButton size="small" title="Close" onClick={() => updateStatus(ticket.id, 'closed')}>
+                                  <TaskAltIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              )}
+                              {isAdmin && (
+                                <IconButton size="small" onClick={() => openEdit(ticket)}>
+                                  <EditIcon sx={{ fontSize: 15 }} />
+                                </IconButton>
+                              )}
+                              {isAdmin && (
+                                <IconButton size="small" color="error" onClick={() => deleteTicket(ticket.id)}>
+                                  <DeleteIcon sx={{ fontSize: 15 }} />
+                                </IconButton>
+                              )}
+                            </Stack>
+                          </TableCell>
+                        </TableRow>,
+
+                        /* Expanded detail row */
+                        isOpen && hasDetails ? (
+                          <TableRow key={`${ticket.id}-detail`}>
+                            <TableCell colSpan={6} sx={{ pb: 2, pt: 0, bgcolor: 'grey.50' }}>
+                              <Box sx={{ px: 2 }}>
+                                <Collapse in={isOpen}>
+                                  <Stack spacing={1} pt={1.5}>
+                                    {ticket.description && (
+                                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>
+                                        {ticket.description}
                                       </Typography>
-                                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                                        {ticket.comments}
-                                      </Typography>
-                                    </Box>
-                                  </>
-                                )}
-                                <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
-                                  {ticket.url && (
-                                    <Stack direction="row" spacing={0.5} alignItems="center">
-                                      <LinkIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                                      <Typography variant="body2" component="a" href={ticket.url}
-                                        target="_blank" rel="noopener noreferrer"
-                                        sx={{ color: 'primary.main', wordBreak: 'break-all' }}>
-                                        {ticket.url}
-                                      </Typography>
+                                    )}
+                                    {ticket.comments && (
+                                      <>
+                                        <Divider />
+                                        <Box>
+                                          <Typography variant="caption" fontWeight={700} color="text.secondary"
+                                            sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', mb: 0.5 }}>
+                                            Comments
+                                          </Typography>
+                                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                                            {ticket.comments}
+                                          </Typography>
+                                        </Box>
+                                      </>
+                                    )}
+                                    <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
+                                      {ticket.url && (
+                                        <Stack direction="row" spacing={0.5} alignItems="center">
+                                          <LinkIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                                          <Typography variant="body2" component="a" href={ticket.url}
+                                            target="_blank" rel="noopener noreferrer"
+                                            sx={{ color: 'primary.main', wordBreak: 'break-all' }}>
+                                            {ticket.url}
+                                          </Typography>
+                                        </Stack>
+                                      )}
+                                      {ticket.screenshot_path && (
+                                        <Button size="small" variant="outlined" startIcon={<AttachFileIcon />}
+                                          onClick={() => openScreenshot(ticket.screenshot_path!)}
+                                          sx={{ alignSelf: 'flex-start' }}>
+                                          View screenshot
+                                        </Button>
+                                      )}
                                     </Stack>
-                                  )}
-                                  {ticket.screenshot_path && (
-                                    <Button size="small" variant="outlined" startIcon={<AttachFileIcon />}
-                                      onClick={() => openScreenshot(ticket.screenshot_path!)}
-                                      sx={{ alignSelf: 'flex-start' }}>
-                                      View screenshot
-                                    </Button>
-                                  )}
-                                </Stack>
-                              </Stack>
-                            </Collapse>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ) : null,
+                                  </Stack>
+                                </Collapse>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ) : null,
+                      ];
+                    }) : []),
                   ];
+                })}
+
+                {/* Ungrouped rows (no known priority) */}
+                {ungrouped.length > 0 && ungrouped.map((ticket) => {
+                  const sm = statusMeta(ticket.status);
+                  const isOpen = expandedTicket === ticket.id;
+                  const hasDetails = ticket.description || ticket.url || ticket.screenshot_path || ticket.comments;
+                  return (
+                    <TableRow key={ticket.id} hover>
+                      <TableCell sx={{ px: 1, py: 0.5 }}>
+                        {hasDetails && (
+                          <IconButton size="small"
+                            onClick={() => setExpandedTicket(isOpen ? null : ticket.id)}
+                            sx={{ color: 'text.disabled', p: 0.25 }}>
+                            <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />
+                          </IconButton>
+                        )}
+                      </TableCell>
+                      <TableCell sx={{ py: 1 }}>
+                        <Typography variant="body2" fontWeight={600} noWrap>{ticket.title}</Typography>
+                        <Typography variant="caption" color="text.secondary" noWrap>{ticket.created_by_email}</Typography>
+                      </TableCell>
+                      <TableCell sx={{ py: 1 }}><TypeChip type={ticket.type} /></TableCell>
+                      <TableCell sx={{ py: 1 }}>
+                        {ticket.module && <Typography variant="caption" fontWeight={500} color="text.secondary" noWrap>{ticket.module}</Typography>}
+                      </TableCell>
+                      <TableCell sx={{ py: 1 }} onClick={(e) => e.stopPropagation()}>
+                        <Select
+                          value={ticket.status}
+                          onChange={(e) => updateStatus(ticket.id, e.target.value)}
+                          size="small"
+                          sx={{
+                            fontSize: 12, fontWeight: 600, height: 28, color: sm.color,
+                            '& .MuiOutlinedInput-notchedOutline': { borderColor: sm.color + '55' },
+                            '& .MuiSelect-icon': { color: sm.color },
+                          }}
+                        >
+                          {STATUSES.map((s) => <MenuItem key={s.value} value={s.value} sx={{ fontSize: 12 }}>{s.label}</MenuItem>)}
+                        </Select>
+                      </TableCell>
+                      <TableCell align="right" sx={{ py: 0.5 }} onClick={(e) => e.stopPropagation()}>
+                        <Stack direction="row" spacing={0.25} justifyContent="flex-end">
+                          {isAdmin && <IconButton size="small" onClick={() => openEdit(ticket)}><EditIcon sx={{ fontSize: 15 }} /></IconButton>}
+                          {isAdmin && <IconButton size="small" color="error" onClick={() => deleteTicket(ticket.id)}><DeleteIcon sx={{ fontSize: 15 }} /></IconButton>}
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  );
                 })}
               </TableBody>
             </Table>
           </TableContainer>
-
-          {/* Summary */}
-          <Divider />
-          <Stack direction="row" spacing={2} sx={{ px: 3, py: 1.5 }} flexWrap="wrap" useFlexGap>
-            <Typography variant="caption" color="text.secondary">
-              Total: <strong>{filtered.length}</strong>
-            </Typography>
-            {STATUSES.map((s) => {
-              const cnt = filtered.filter((t) => t.status === s.value).length;
-              if (!cnt) return null;
-              return (
-                <Typography key={s.value} variant="caption" sx={{ color: s.color }}>
-                  {s.label}: <strong>{cnt}</strong>
-                </Typography>
-              );
-            })}
-          </Stack>
         </Paper>
       )}
 
