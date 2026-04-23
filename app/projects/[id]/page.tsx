@@ -38,6 +38,17 @@ export default async function ProjectPage({
 
   const adminClient = await createAdminClient();
 
+  // Redirect to canonical /{company}/{folder} URL when slugs are available
+  if (folder.company_id) {
+    const { data: company } = await adminClient
+      .from('companies').select('slug').eq('id', folder.company_id).single();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const folderSlug = (folder as any).slug ?? null;
+    if (company?.slug && folderSlug) {
+      redirect(`/${company.slug}/${folderSlug}`);
+    }
+  }
+
   if (!isAdmin) {
     if (!folder.company_id) notFound();
     const { data: membership } = await adminClient
@@ -66,10 +77,15 @@ export default async function ProjectPage({
   };
   const { data: rawCompanies } = await adminClient
     .from('companies')
-    .select('id, name')
+    .select('id, name, slug')
     .order('name', { ascending: true });
 
   const companies = (rawCompanies ?? []).map((c) => ({ id: c.id as string, name: c.name as string }));
+
+  // Company for breadcrumb
+  const folderCompany = folder.company_id
+    ? (rawCompanies ?? []).find((c) => c.id === folder.company_id) ?? null
+    : null;
 
   const { data: rawRoadmap } = await adminClient
     .from('documents')
@@ -141,8 +157,18 @@ export default async function ProjectPage({
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Breadcrumbs sx={{ mb: 3 }}>
           <Link href="/" style={{ textDecoration: 'none' }}>
-            <Button size="small" color="inherit" sx={{ textTransform: 'none' }}>Projects</Button>
+            <Button size="small" color="inherit" sx={{ textTransform: 'none' }}>Dashboard</Button>
           </Link>
+          {folderCompany && (
+            <Link
+              href={folderCompany.slug ? `/${folderCompany.slug}` : '/'}
+              style={{ textDecoration: 'none' }}
+            >
+              <Button size="small" color="inherit" sx={{ textTransform: 'none' }}>
+                {folderCompany.name}
+              </Button>
+            </Link>
+          )}
           <Typography color="text.primary" fontWeight={600}>{project.name}</Typography>
         </Breadcrumbs>
 

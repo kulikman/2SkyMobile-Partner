@@ -65,7 +65,18 @@ export async function POST(req: NextRequest) {
 
     if (doc) {
       const { data: folder } = await adminClient
-        .from('folders').select('company_id').eq('id', doc.folder_id).single();
+        .from('folders').select('slug, company_id').eq('id', doc.folder_id).single();
+
+      // Build canonical link /{company}/{folder}?tab=tasks&task={id}
+      let taskLink = `/projects/${doc.folder_id}?tab=tasks&task=${task_id}`;
+      if (folder?.slug && folder.company_id) {
+        const { data: company } = await adminClient
+          .from('companies').select('slug').eq('id', folder.company_id).single();
+        if (company?.slug) {
+          taskLink = `/${company.slug}/${folder.slug}?tab=tasks&task=${task_id}`;
+        }
+      }
+
       const { data: { users: allUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
 
       const targets = allUsers.filter((u) => {
@@ -82,7 +93,7 @@ export async function POST(req: NextRequest) {
             type: isReply ? 'new_reply' : 'new_comment',
             title: isReply ? `New reply on "${doc.title}"` : `New comment on "${doc.title}"`,
             body: content.trim().slice(0, 120),
-            link: `/projects/${doc.folder_id}?tab=tasks&task=${task_id}`,
+            link: taskLink,
           })
         )
       );

@@ -61,7 +61,7 @@ export default async function HomePage() {
     const companySlug = companyId ? (companySlugById.get(companyId) ?? null) : null;
     const href =
       companySlug && folderSlug
-        ? `/c/${companySlug}/${folderSlug}`
+        ? `/${companySlug}/${folderSlug}`
         : `/projects/${f.id}`;
 
     return {

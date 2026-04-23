@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { WhiteboardViewerClient } from "@/components/WhiteboardViewerClient";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { DocumentWithComments } from "@/components/DocumentWithComments";
@@ -29,13 +29,31 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: baseDoc } = await supabase
+  const adminClient = await createAdminClient();
+
+  const { data: baseDoc } = await adminClient
     .from("documents")
-    .select("id, slug, title, content, doc_type, metadata")
+    .select("id, slug, title, content, doc_type, metadata, folder_id")
     .eq("slug", slug)
     .single();
 
   if (!baseDoc) notFound();
+
+  // Redirect to canonical /{company}/{folder}/{doc-slug} when possible
+  if (baseDoc.folder_id) {
+    const { data: folder } = await adminClient
+      .from("folders")
+      .select("slug, company_id")
+      .eq("id", baseDoc.folder_id)
+      .single();
+    if (folder?.slug && folder.company_id) {
+      const { data: company } = await adminClient
+        .from("companies").select("slug").eq("id", folder.company_id).single();
+      if (company?.slug) {
+        redirect(`/${company.slug}/${folder.slug}/${slug}`);
+      }
+    }
+  }
 
   const { data: sharing } = await supabase
     .from("documents")
@@ -76,7 +94,6 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
       .from("comments").select("*")
       .eq("document_id", doc.id).order("created_at", { ascending: true });
 
-    const adminClient = await createAdminClient();
     const userDirectory = await adminClient.auth.admin.listUsers({ perPage: 1000 });
     const users = userDirectory.data.users ?? [];
 

@@ -127,7 +127,7 @@ function CompanySection({
 }) {
   const accent = company.color ?? '#1976d2';
   const initials = company.name.slice(0, 2).toUpperCase();
-  const spaceHref = company.slug ? `/c/${company.slug}` : null;
+  const spaceHref = company.slug ? `/${company.slug}` : null;
   const activeCount = projects.filter((p) =>
     ['in_progress', 'in_discussion', 'on_hold'].includes(p.status)
   ).length;
@@ -257,7 +257,7 @@ export function ProjectDashboard({
       const newComp = companyOptions.find((c) => c.id === (newCompanyId || null));
       const folderSlug = data.slug ?? null;
       const companySlug = newComp?.slug ?? null;
-      const href = companySlug && folderSlug ? `/c/${companySlug}/${folderSlug}` : `/projects/${data.id}`;
+      const href = companySlug && folderSlug ? `/${companySlug}/${folderSlug}` : `/projects/${data.id}`;
       setProjects((prev) => [...prev, {
         id: data.id, href,
         name: data.name, color: data.color ?? null, icon: data.icon ?? null,

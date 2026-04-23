@@ -36,7 +36,7 @@ export async function resolveSpacePath(
     .single();
   if (!company) return null;
 
-  const companyBase = `/c/${companySlug}`;
+  const companyBase = `/${companySlug}`;
 
   if (pathSegments.length === 0) {
     return { kind: 'company', companyId: company.id, companyName: company.name, companySlug };
