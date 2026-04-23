@@ -111,7 +111,7 @@ export function ThemeRegistry({ children }: { children: React.ReactNode }) {
                 },
               },
               text: {
-                color: CRM.ink[600],
+                color: CRM.ink[700],
               },
             },
           },
