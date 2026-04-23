@@ -27,6 +27,7 @@ export function ProjectTabs({
   initialSpec,
   isAdmin,
   currentUser,
+  canonicalBase,
 }: {
   folderId: string;
   projectStartAt: string | null;
@@ -36,6 +37,7 @@ export function ProjectTabs({
   initialSpec: Record<string, string> | null;
   isAdmin: boolean;
   currentUser: CurrentUser;
+  canonicalBase?: string;
 }) {
   const [tab, setTab] = useState(0);
 
@@ -100,7 +102,7 @@ export function ProjectTabs({
 
       <Box sx={{ display: tab === 6 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
-          <ReportList reports={reports} folderId={folderId} isAdmin={isAdmin} />
+          <ReportList reports={reports} folderId={folderId} isAdmin={isAdmin} canonicalBase={canonicalBase} />
         </Paper>
       </Box>
     </Box>

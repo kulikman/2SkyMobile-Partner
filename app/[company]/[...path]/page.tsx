@@ -8,16 +8,18 @@ import CardActionArea from '@mui/material/CardActionArea';
 import CardContent from '@mui/material/CardContent';
 import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
-import Breadcrumbs from '@mui/material/Breadcrumbs';
 import FolderIcon from '@mui/icons-material/Folder';
 import DescriptionIcon from '@mui/icons-material/Description';
 import EditIcon from '@mui/icons-material/Edit';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Link from 'next/link';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { Navbar } from '@/components/Navbar';
 import { SpaceBreadcrumbs } from '@/components/SpaceBreadcrumbs';
 import { resolveSpacePath } from '@/lib/resolve-space-path';
 import { WhiteboardViewerClient } from '@/components/WhiteboardViewerClient';
+import { WhiteboardAdminPage } from '@/components/WhiteboardAdminPage';
+import { DocumentEditorForm } from '@/components/DocumentEditorForm';
 import { DocumentWithComments } from '@/components/DocumentWithComments';
 import { RoadmapDocRenderer } from '@/components/doc-renderers/RoadmapDocRenderer';
 import { TaskDocRenderer } from '@/components/doc-renderers/TaskDocRenderer';
@@ -51,6 +53,68 @@ export default async function SpacePathPage({
   if (!user) redirect('/login');
 
   const isAdmin = user.user_metadata?.role === 'admin';
+
+  // ── Edit view: /{company}/.../{doc-slug}/edit ─────────────────────────────
+  if (path[path.length - 1] === 'edit') {
+    if (!isAdmin) notFound();
+    const docPath = path.slice(0, -1);
+    const resolved = await resolveSpacePath(companySlug, docPath);
+    if (!resolved || resolved.kind !== 'document') notFound();
+
+    const adminClient = await createAdminClient();
+    const { data: doc } = await adminClient
+      .from('documents')
+      .select('id, title, slug, content, doc_type, description, image, public_access_enabled, public_comments_visible, anonymous_comments_enabled')
+      .eq('id', resolved.documentId)
+      .single();
+    if (!doc) notFound();
+
+    const backHref = `/${companySlug}/${docPath.join('/')}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const docType = (doc as any).doc_type ?? 'md';
+
+    if (docType === 'whiteboard') {
+      return (
+        <Box sx={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
+          <WhiteboardAdminPage
+            documentId={doc.id}
+            slug={doc.slug}
+            title={doc.title}
+            backHref={backHref}
+            initialSnapshot={doc.content && doc.content !== '{}' ? doc.content : null}
+          />
+        </Box>
+      );
+    }
+
+    return (
+      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+        <Navbar isAdmin={isAdmin} userId={user.id} />
+        <Container maxWidth="xl" sx={{ py: 5 }}>
+          <SpaceBreadcrumbs items={resolved.breadcrumbs.slice(0, -1)} current={`Edit: ${doc.title}`} />
+          <Link href={backHref} style={{ textDecoration: 'none' }}>
+            <Button startIcon={<ArrowBackIcon />} size="small" sx={{ mb: 3 }}>
+              Back to document
+            </Button>
+          </Link>
+          <Typography variant="h5" fontWeight={700} mb={3}>Edit document</Typography>
+          <DocumentEditorForm
+            mode="edit"
+            documentId={doc.id}
+            initialTitle={doc.title}
+            initialSlug={doc.slug}
+            initialDescription={doc.description ?? ''}
+            initialImage={doc.image ?? ''}
+            initialContent={doc.content}
+            initialPublicAccessEnabled={Boolean(doc.public_access_enabled)}
+            initialPublicCommentsVisible={Boolean(doc.public_comments_visible)}
+            initialAnonymousCommentsEnabled={Boolean(doc.anonymous_comments_enabled)}
+          />
+        </Container>
+      </Box>
+    );
+  }
+
   const resolved = await resolveSpacePath(companySlug, path);
   if (!resolved) notFound();
 
@@ -154,17 +218,10 @@ export default async function SpacePathPage({
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
         <Navbar isAdmin={isAdmin} userId={user.id} />
         <Container maxWidth="lg" sx={{ py: 4 }}>
-          <Breadcrumbs sx={{ mb: 3 }}>
-            <Link href="/" style={{ textDecoration: 'none' }}>
-              <Button size="small" color="inherit" sx={{ textTransform: 'none' }}>Dashboard</Button>
-            </Link>
-            <Link href={`/${companySlug}`} style={{ textDecoration: 'none' }}>
-              <Button size="small" color="inherit" sx={{ textTransform: 'none' }}>
-                {resolved.companyName}
-              </Button>
-            </Link>
-            <Typography color="text.primary" fontWeight={600}>{project.name}</Typography>
-          </Breadcrumbs>
+          <SpaceBreadcrumbs
+            items={[{ label: resolved.companyName, href: `/${companySlug}` }]}
+            current={project.name}
+          />
 
           <ProjectDetail
             project={project}
@@ -182,6 +239,7 @@ export default async function SpacePathPage({
             initialSpec={f.tech_spec as Record<string, string> | null ?? null}
             isAdmin={isAdmin}
             currentUser={currentUser}
+            canonicalBase={`/${companySlug}/${path[0]}`}
           />
         </Container>
       </Box>
@@ -297,7 +355,7 @@ export default async function SpacePathPage({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const metadata: Record<string, unknown> = (doc as any).metadata ?? {};
     const breadcrumbsWithoutCurrent = resolved.breadcrumbs.slice(0, -1);
-    const editHref = isAdmin ? `/admin/documents/${doc.slug}` : undefined;
+    const editHref = isAdmin ? `/${companySlug}/${path.join('/')}/edit` : undefined;
 
     if (docType === 'whiteboard') {
       return (

@@ -53,10 +53,12 @@ export function ReportList({
   reports: initialReports,
   folderId,
   isAdmin,
+  canonicalBase,
 }: {
   reports: ReportDoc[];
   folderId: string;
   isAdmin: boolean;
+  canonicalBase?: string;
 }) {
   const router = useRouter();
   const [reports] = useState(initialReports);
@@ -128,7 +130,7 @@ export function ReportList({
       const { slug } = await res.json();
       setDialogOpen(false);
       setTitle('');
-      router.push(`/admin/documents/${slug}`);
+      router.push(canonicalBase ? `${canonicalBase}/${slug}/edit` : `/admin/documents/${slug}`);
     }
     setLoading(false);
   }
@@ -162,7 +164,7 @@ export function ReportList({
               key={report.id}
               variant="outlined"
               component={Link}
-              href={`/docs/${report.slug}`}
+              href={canonicalBase ? `${canonicalBase}/${report.slug}` : `/docs/${report.slug}`}
               sx={[
                 {
                   p: 2,

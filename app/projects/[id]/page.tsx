@@ -179,6 +179,11 @@ export default async function ProjectPage({
           initialSpec={f.tech_spec as Record<string, string> | null ?? null}
           isAdmin={isAdmin}
           currentUser={currentUser}
+          canonicalBase={
+            folderCompany?.slug && (f.slug as string | null)
+              ? `/${folderCompany.slug}/${f.slug as string}`
+              : undefined
+          }
         />
       </Container>
     </Box>
