@@ -28,22 +28,16 @@ export type RoadmapItem = {
   created_at: string;
 };
 
+const STATUS_META: Record<string, { label: string; color: string }> = {
+  completed:   { label: 'Completed',   color: '#388e3c' },
+  in_progress: { label: 'In progress', color: '#1976d2' },
+  pending:     { label: 'Pending',     color: '#9e9e9e' },
+};
+
 const statusIcon: Record<string, React.ReactNode> = {
-  completed: <CheckCircleIcon sx={{ color: 'success.main', fontSize: 22 }} />,
-  in_progress: <PlayCircleOutlineIcon sx={{ color: 'info.main', fontSize: 22 }} />,
-  pending: <RadioButtonUncheckedIcon sx={{ color: 'text.disabled', fontSize: 22 }} />,
-};
-
-const statusLabel: Record<string, string> = {
-  completed: 'Completed',
-  in_progress: 'In progress',
-  pending: 'Pending',
-};
-
-const statusColor: Record<string, 'success' | 'info' | 'default'> = {
-  completed: 'success',
-  in_progress: 'info',
-  pending: 'default',
+  completed:   <CheckCircleIcon sx={{ color: '#388e3c', fontSize: 22 }} />,
+  in_progress: <PlayCircleOutlineIcon sx={{ color: '#1976d2', fontSize: 22 }} />,
+  pending:     <RadioButtonUncheckedIcon sx={{ color: '#9e9e9e', fontSize: 22 }} />,
 };
 
 export function RoadmapView({
@@ -136,18 +130,12 @@ export function RoadmapView({
           <Paper
             key={item.id}
             variant="outlined"
-            sx={[
-              {
-                p: 2,
-                borderRadius: 3,
-                borderColor: item.status === 'completed' ? 'success.light' : 'divider',
-                opacity: item.status === 'completed' ? 0.75 : 1,
-              },
-              (theme) =>
-                theme.applyStyles('dark', {
-                  borderColor: item.status === 'completed' ? 'success.dark' : 'divider',
-                }),
-            ]}
+            sx={{
+              p: 2,
+              borderRadius: 3,
+              borderColor: item.status === 'completed' ? '#a5d6a7' : 'divider',
+              opacity: item.status === 'completed' ? 0.75 : 1,
+            }}
           >
             <Stack direction="row" spacing={1.5} alignItems="center">
               <Box
@@ -174,10 +162,15 @@ export function RoadmapView({
               </Box>
               <Stack direction="row" spacing={0.5} alignItems="center">
                 <Chip
-                  label={statusLabel[item.status] ?? item.status}
+                  label={STATUS_META[item.status]?.label ?? item.status}
                   size="small"
-                  color={statusColor[item.status] ?? 'default'}
-                  variant="outlined"
+                  sx={{
+                    bgcolor: (STATUS_META[item.status]?.color ?? '#9e9e9e') + '22',
+                    color: STATUS_META[item.status]?.color ?? '#9e9e9e',
+                    fontWeight: 600,
+                    fontSize: 11,
+                    border: `1px solid ${(STATUS_META[item.status]?.color ?? '#9e9e9e')}44`,
+                  }}
                 />
                 {item.due_date && (
                   <Chip
