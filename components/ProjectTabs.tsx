@@ -12,6 +12,7 @@ import { ProjectFilesView } from './ProjectFilesView';
 import { TechStackEditor } from './TechStackEditor';
 import { ReportList } from './ReportList';
 import { IssuesView } from './IssuesView';
+import { TestingView } from './TestingView';
 import type { Task } from './TasksView';
 import type { RoadmapItem } from './RoadmapView';
 import type { ReportDoc } from './ReportList';
@@ -52,6 +53,7 @@ export function ProjectTabs({
       >
         <Tab label="Tasks" />
         <Tab label="Issues" />
+        <Tab label="Testing" />
         <Tab label="Roadmap" />
         <Tab label="Meetings" />
         <Tab label="Documentation" />
@@ -78,29 +80,35 @@ export function ProjectTabs({
 
       <Box sx={{ display: tab === 2 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
-          <RoadmapView items={roadmapItems} folderId={folderId} isAdmin={isAdmin} />
+          <TestingView folderId={folderId} currentUser={currentUser} />
         </Paper>
       </Box>
 
       <Box sx={{ display: tab === 3 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
-          <MeetingsView folderId={folderId} isAdmin={isAdmin} />
+          <RoadmapView items={roadmapItems} folderId={folderId} isAdmin={isAdmin} />
         </Paper>
       </Box>
 
       <Box sx={{ display: tab === 4 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
-          <ProjectFilesView folderId={folderId} isAdmin={isAdmin} />
+          <MeetingsView folderId={folderId} isAdmin={isAdmin} />
         </Paper>
       </Box>
 
       <Box sx={{ display: tab === 5 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
-          <TechStackEditor folderId={folderId} initialSpec={initialSpec} isAdmin={isAdmin} />
+          <ProjectFilesView folderId={folderId} isAdmin={isAdmin} />
         </Paper>
       </Box>
 
       <Box sx={{ display: tab === 6 ? 'block' : 'none' }}>
+        <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
+          <TechStackEditor folderId={folderId} initialSpec={initialSpec} isAdmin={isAdmin} />
+        </Paper>
+      </Box>
+
+      <Box sx={{ display: tab === 7 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
           <ReportList reports={reports} folderId={folderId} isAdmin={isAdmin} canonicalBase={canonicalBase} />
         </Paper>

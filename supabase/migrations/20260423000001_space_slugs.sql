@@ -2,6 +2,7 @@
 
 -- 1. Companies: add slug (unique)
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS slug text;
+ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_slug_unique;
 ALTER TABLE companies ADD CONSTRAINT companies_slug_unique UNIQUE (slug);
 
 -- 2. Folders: add slug (unique per scope)
