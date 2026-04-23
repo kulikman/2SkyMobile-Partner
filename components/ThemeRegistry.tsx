@@ -1,63 +1,15 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ThemeProvider, createTheme, type Theme } from '@mui/material/styles';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter';
-import type { StorageManager } from '@mui/system/cssVars';
-import type { ThemeMode } from '@/lib/theme-mode';
-import { THEME_MODE_COOKIE } from '@/lib/theme-mode';
 import { CRM } from '@/lib/crm-design-tokens';
-
-const THEME_CHANGE_EVENT = 'threadoc-theme-mode-change';
-
-function readCookieValue(key: string) {
-  if (typeof document === 'undefined') return null;
-
-  const prefix = `${key}=`;
-  for (const cookie of document.cookie.split(';')) {
-    const trimmed = cookie.trim();
-    if (trimmed.startsWith(prefix)) {
-      return decodeURIComponent(trimmed.slice(prefix.length));
-    }
-  }
-
-  return null;
-}
-
-const cookieStorageManager: StorageManager = ({ key }) => ({
-  get(defaultValue) {
-    return readCookieValue(key) ?? defaultValue;
-  },
-  set(value) {
-    if (typeof document === 'undefined') return;
-
-    document.cookie = `${key}=${encodeURIComponent(String(value))}; Path=/; Max-Age=31536000; SameSite=Lax`;
-    window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { key, value } }));
-  },
-  subscribe(handler) {
-    const listener = (event: Event) => {
-      const detail = (event as CustomEvent<{ key?: string; value?: unknown }>).detail;
-      if (detail?.key === key) {
-        handler(detail.value);
-      }
-    };
-
-    window.addEventListener(THEME_CHANGE_EVENT, listener);
-    return () => window.removeEventListener(THEME_CHANGE_EVENT, listener);
-  },
-});
 
 const figtreeStack =
   'var(--font-figtree), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
-export function ThemeRegistry({
-  children,
-  initialMode,
-}: {
-  children: React.ReactNode;
-  initialMode: ThemeMode;
-}) {
+export function ThemeRegistry({ children }: { children: React.ReactNode }) {
   const theme = useMemo(
     () =>
       createTheme({
@@ -84,24 +36,6 @@ export function ThemeRegistry({
               action: { hover: CRM.ink[50], selected: CRM.brand.tint },
             },
           },
-          dark: {
-            palette: {
-              primary: {
-                main: '#5CB3FF',
-                light: '#B8E0FF',
-                dark: '#3A9AE8',
-                contrastText: '#ffffff',
-              },
-              secondary: { main: '#C7CCD1', contrastText: '#0e1114' },
-              divider: 'rgba(199, 204, 209, 0.28)',
-              background: { default: '#0e1114', paper: '#181c20' },
-              text: { primary: '#f5f6f7', secondary: '#9ca3af' },
-              error: { main: '#f0a8a6' },
-              success: { main: '#86efac' },
-              warning: { main: '#fbbf24' },
-              action: { hover: 'rgba(255,255,255,0.06)', selected: 'rgba(0,124,219,0.18)' },
-            },
-          },
         },
         shape: { borderRadius: 4 },
         typography: {
@@ -126,14 +60,11 @@ export function ThemeRegistry({
         components: {
           MuiCssBaseline: {
             styleOverrides: {
-              body: ({ theme }: { theme: Theme }) => ({
+              body: {
                 backgroundColor: CRM.ink[50],
                 backgroundImage: 'none',
                 WebkitFontSmoothing: 'antialiased',
-                ...theme.applyStyles('dark', {
-                  backgroundColor: theme.palette.background.default,
-                }),
-              }),
+              },
             },
           },
           MuiPaper: {
@@ -142,12 +73,9 @@ export function ThemeRegistry({
                 backgroundImage: 'none',
                 borderRadius: CRM.radius.xl,
               },
-              outlined: ({ theme }) => ({
+              outlined: {
                 borderColor: CRM.ink[200],
-                ...theme.applyStyles('dark', {
-                  borderColor: 'rgba(199, 204, 209, 0.22)',
-                }),
-              }),
+              },
             },
           },
           MuiCard: {
@@ -172,7 +100,7 @@ export function ThemeRegistry({
                 '&:hover': { backgroundColor: CRM.brand.hover },
                 '&:active': { backgroundColor: CRM.brand.active },
               },
-              outlined: ({ theme }) => ({
+              outlined: {
                 borderWidth: '1px',
                 borderColor: CRM.ink[200],
                 color: CRM.ink[700],
@@ -181,21 +109,10 @@ export function ThemeRegistry({
                   backgroundColor: CRM.ink[50],
                   color: CRM.ink[900],
                 },
-                ...theme.applyStyles('dark', {
-                  borderColor: 'rgba(199, 204, 209, 0.28)',
-                  color: theme.palette.text.secondary,
-                  '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.06)',
-                    color: theme.palette.text.primary,
-                  },
-                }),
-              }),
-              text: ({ theme }) => ({
-                color: theme.palette.text.secondary,
-                ...theme.applyStyles('dark', {
-                  color: theme.palette.text.primary,
-                }),
-              }),
+              },
+              text: {
+                color: CRM.ink[600],
+              },
             },
           },
           MuiOutlinedInput: {
@@ -227,21 +144,14 @@ export function ThemeRegistry({
           },
           MuiToggleButtonGroup: {
             styleOverrides: {
-              root: ({ theme }) => ({
+              root: {
                 borderRadius: 4,
                 border: `1px solid ${CRM.ink[200]}`,
                 backgroundColor: '#ffffff',
-                ...theme.applyStyles('dark', {
-                  borderColor: 'rgba(199, 204, 209, 0.22)',
-                  backgroundColor: 'rgba(24, 28, 32, 0.6)',
-                }),
-              }),
+              },
               grouped: ({ theme }) => ({
                 border: 0,
                 color: theme.palette.text.secondary,
-                ...theme.applyStyles('dark', {
-                  color: theme.palette.text.primary,
-                }),
                 '&.Mui-selected': {
                   color: theme.palette.primary.contrastText,
                   backgroundColor: theme.palette.primary.main,
@@ -259,13 +169,7 @@ export function ThemeRegistry({
 
   return (
     <AppRouterCacheProvider>
-      <ThemeProvider
-        theme={theme}
-        defaultMode={initialMode}
-        modeStorageKey={THEME_MODE_COOKIE}
-        storageManager={cookieStorageManager}
-        disableTransitionOnChange
-      >
+      <ThemeProvider theme={theme} defaultMode="light" disableTransitionOnChange>
         <CssBaseline enableColorScheme />
         {children}
       </ThemeProvider>

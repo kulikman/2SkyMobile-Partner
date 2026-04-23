@@ -7,7 +7,6 @@ import Box from '@mui/material/Box';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { ThemeModeToggle } from '@/components/ThemeModeToggle';
 import { NotificationsMenu } from '@/components/NotificationsMenu';
 
 export function Navbar({ isAdmin, userId }: { isAdmin: boolean; userId?: string }) {
@@ -25,21 +24,15 @@ export function Navbar({ isAdmin, userId }: { isAdmin: boolean; userId?: string 
       <Paper
         elevation={0}
         variant="outlined"
-        sx={[
-          (theme) => ({
-            px: { xs: 1.5, md: 2.25 },
-            py: 1.25,
-            borderRadius: '14px',
-            bgcolor: 'background.paper',
-            backgroundImage: 'none',
-            borderColor: theme.palette.divider,
-            boxShadow: '0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04)',
-          }),
-          (theme) =>
-            theme.applyStyles('dark', {
-              boxShadow: '0 4px 16px rgba(0,0,0,.25)',
-            }),
-        ]}
+        sx={{
+          px: { xs: 1.5, md: 2.25 },
+          py: 1.25,
+          borderRadius: '14px',
+          bgcolor: 'background.paper',
+          backgroundImage: 'none',
+          borderColor: 'divider',
+          boxShadow: '0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04)',
+        }}
       >
         <Stack
           direction={{ xs: 'column', md: 'row' }}
@@ -105,7 +98,6 @@ export function Navbar({ isAdmin, userId }: { isAdmin: boolean; userId?: string 
               </>
             )}
             {userId && <NotificationsMenu userId={userId} />}
-            <ThemeModeToggle />
             <Button
               onClick={handleLogout}
               size="small"
