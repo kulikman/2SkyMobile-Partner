@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -14,6 +14,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
 import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
@@ -199,6 +200,32 @@ export function ProjectDashboard({
   const [newCompanyId, setNewCompanyId] = useState('');
   const [newStatus, setNewStatus] = useState('in_discussion');
   const [creating, setCreating] = useState(false);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+  const [fetchedCompanies, setFetchedCompanies] = useState<CompanyForDashboard[] | null>(null);
+
+  const companyOptions = useMemo(
+    () => (companies.length > 0 ? companies : (fetchedCompanies ?? [])),
+    [companies, fetchedCompanies]
+  );
+
+  async function openCreateDialog() {
+    setCreateOpen(true);
+    if (!isAdmin) return;
+    if (companies.length > 0) return;
+    if (fetchedCompanies) return;
+
+    setCompaniesLoading(true);
+    try {
+      const res = await fetch('/api/companies');
+      if (!res.ok) throw new Error('Failed to load companies');
+      const data = await res.json();
+      setFetchedCompanies(Array.isArray(data) ? data : []);
+    } catch {
+      setFetchedCompanies([]);
+    } finally {
+      setCompaniesLoading(false);
+    }
+  }
 
   async function createProject() {
     if (!newName.trim()) return;
@@ -210,13 +237,13 @@ export function ProjectDashboard({
         name: newName.trim(),
         status: newStatus,
         company_id: newCompanyId || null,
-        client_name: companies.find((c) => c.id === newCompanyId)?.name ?? null,
+        client_name: companyOptions.find((c) => c.id === newCompanyId)?.name ?? null,
         position: projects.length,
       }),
     });
     if (res.ok) {
       const data = await res.json();
-      const newComp = companies.find((c) => c.id === (newCompanyId || null));
+      const newComp = companyOptions.find((c) => c.id === (newCompanyId || null));
       const folderSlug = data.slug ?? null;
       const companySlug = newComp?.slug ?? null;
       const href = companySlug && folderSlug ? `/c/${companySlug}/${folderSlug}` : `/projects/${data.id}`;
@@ -267,7 +294,7 @@ export function ProjectDashboard({
           </Typography>
         </Box>
         {isAdmin && (
-          <Button variant="contained" startIcon={<AddIcon />} size="small" onClick={() => setCreateOpen(true)}>
+          <Button variant="contained" startIcon={<AddIcon />} size="small" onClick={openCreateDialog}>
             New project
           </Button>
         )}
@@ -299,15 +326,32 @@ export function ProjectDashboard({
               label="Project name" value={newName}
               onChange={(e) => setNewName(e.target.value)} fullWidth autoFocus
             />
-            {companies.length > 0 && (
-              <TextField
-                label="Company" select value={newCompanyId}
-                onChange={(e) => setNewCompanyId(e.target.value)} fullWidth
+            <Stack spacing={0.75}>
+              <Typography variant="caption" color="text.secondary">Company</Typography>
+              <Select
+                value={newCompanyId}
+                onChange={(e) => setNewCompanyId(String(e.target.value))}
+                size="small"
+                fullWidth
+                displayEmpty
+                MenuProps={{ disablePortal: true }}
               >
                 <MenuItem value="">— No company —</MenuItem>
-                {companies.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-              </TextField>
-            )}
+                {companyOptions.map((c) => (
+                  <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                ))}
+              </Select>
+              {companiesLoading && (
+                <Typography variant="caption" color="text.secondary">
+                  Loading companies…
+                </Typography>
+              )}
+              {!companiesLoading && companyOptions.length === 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  Create a company first (Admin → Companies)
+                </Typography>
+              )}
+            </Stack>
             <TextField
               label="Status" select value={newStatus}
               onChange={(e) => setNewStatus(e.target.value)} fullWidth
