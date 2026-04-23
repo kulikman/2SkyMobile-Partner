@@ -20,6 +20,7 @@ function docToTask(doc: Record<string, any>) {
     start_date: m.start_date ?? null,
     due_date: m.due_date ?? null,
     completed_at: m.completed_at ?? null,
+    parent_id: m.parent_id ?? null,
   };
 }
 
@@ -70,6 +71,7 @@ export async function PATCH(
     meta.status = body.status;
     meta.completed_at = body.status === 'done' ? new Date().toISOString() : null;
   }
+  if (body.parent_id !== undefined) meta.parent_id = body.parent_id;
   docUpdates.metadata = meta;
 
   const { data, error } = await adminClient

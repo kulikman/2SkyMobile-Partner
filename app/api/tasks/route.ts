@@ -22,6 +22,7 @@ function docToTask(doc: Record<string, any>) {
     start_date: m.start_date ?? null,
     due_date: m.due_date ?? null,
     completed_at: m.completed_at ?? null,
+    parent_id: m.parent_id ?? null,
   };
 }
 
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
   catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
   const { folder_id, group_label, title, type, role, estimated_hours,
-    depends_on, position, start_date, due_date, description } = body;
+    depends_on, position, start_date, due_date, description, parent_id } = body;
 
   if (!folder_id || !title?.trim()) {
     return NextResponse.json({ error: 'folder_id and title are required' }, { status: 400 });
@@ -87,6 +88,7 @@ export async function POST(req: NextRequest) {
         start_date: start_date ?? null,
         due_date: due_date ?? null,
         completed_at: null,
+        parent_id: parent_id ?? null,
       },
     })
     .select('id, folder_id, title, description, position, created_at, metadata')

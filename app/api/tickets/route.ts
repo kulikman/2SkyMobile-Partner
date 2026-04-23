@@ -23,6 +23,7 @@ function docToTicket(doc: Record<string, any>, createdByEmail = '') {
     comments: m.comments ?? null,
     updated_at: m.updated_at ?? doc.created_at,
     created_by_email: createdByEmail,
+    parent_id: m.parent_id ?? null,
   };
 }
 
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
   catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
   const { folder_id, title, description, url, screenshot_path,
-    module, type, priority, severity, comments } = body;
+    module, type, priority, severity, comments, parent_id } = body;
 
   if (!folder_id || !title?.trim()) {
     return NextResponse.json({ error: 'folder_id and title required' }, { status: 400 });
@@ -93,6 +94,7 @@ export async function POST(req: NextRequest) {
         screenshot_path: screenshot_path ?? null,
         created_by: user.id,
         comments: comments?.trim() ?? null,
+        parent_id: parent_id ?? null,
         updated_at: new Date().toISOString(),
       },
     })

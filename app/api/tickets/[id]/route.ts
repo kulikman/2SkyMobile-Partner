@@ -75,6 +75,7 @@ export async function PATCH(
     if (priority !== undefined)        meta.priority = priority;
     if (severity !== undefined)        meta.severity = severity;
     if (comments !== undefined)        meta.comments = comments?.trim() ?? null;
+    if (body.parent_id !== undefined)  meta.parent_id = body.parent_id;
   }
   docUpdates.metadata = meta;
 
@@ -97,6 +98,7 @@ export async function PATCH(
     module: m.module ?? null, url: m.url ?? null,
     screenshot_path: m.screenshot_path ?? null, created_by: m.created_by ?? null,
     comments: m.comments ?? null, updated_at: m.updated_at,
+    parent_id: m.parent_id ?? null,
   });
 }
 
