@@ -10,9 +10,10 @@ import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
+import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import NotificationsIcon from '@mui/icons-material/Notifications';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import { useRouter } from 'next/navigation';
 
@@ -38,6 +39,7 @@ const TYPE_COLORS: Record<string, 'default' | 'primary' | 'warning' | 'success' 
 export function NotificationsMenu({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Notification[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const anchorRef = useRef<HTMLButtonElement>(null);
@@ -57,7 +59,11 @@ export function NotificationsMenu({ userId }: { userId: string }) {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-        (payload) => setItems((prev) => [payload.new as Notification, ...prev]),
+        (payload) => {
+          const n = payload.new as Notification;
+          setItems((prev) => [n, ...prev]);
+          setToast(n.title);
+        },
       )
       .subscribe();
 
@@ -92,6 +98,7 @@ export function NotificationsMenu({ userId }: { userId: string }) {
   }
 
   return (
+    <>
     <ClickAwayListener onClickAway={() => setOpen(false)}>
       <Box sx={{ position: 'relative' }}>
         <IconButton
@@ -99,9 +106,22 @@ export function NotificationsMenu({ userId }: { userId: string }) {
           size="small"
           onClick={() => setOpen((v) => !v)}
           aria-label="Notifications"
+          sx={unread > 0 ? {
+            '@keyframes bellRing': {
+              '0%, 75%, 100%': { transform: 'rotate(0deg)' },
+              '80%': { transform: 'rotate(18deg)' },
+              '85%': { transform: 'rotate(-18deg)' },
+              '90%': { transform: 'rotate(12deg)' },
+              '95%': { transform: 'rotate(-8deg)' },
+            },
+            animation: 'bellRing 2.5s ease-in-out infinite',
+            color: 'warning.main',
+          } : {}}
         >
           <Badge badgeContent={unread} color="error" max={99}>
-            {unread > 0 ? <NotificationsIcon fontSize="small" /> : <NotificationsNoneIcon fontSize="small" />}
+            {unread > 0
+              ? <NotificationsActiveIcon fontSize="small" />
+              : <NotificationsNoneIcon fontSize="small" />}
           </Badge>
         </IconButton>
 
@@ -193,5 +213,29 @@ export function NotificationsMenu({ userId }: { userId: string }) {
         )}
       </Box>
     </ClickAwayListener>
+
+    <Snackbar
+      open={!!toast}
+      autoHideDuration={5000}
+      onClose={() => setToast(null)}
+      anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      message={
+        <Stack direction="row" spacing={1} alignItems="center">
+          <NotificationsActiveIcon fontSize="small" sx={{ color: 'warning.light' }} />
+          <span>{toast}</span>
+        </Stack>
+      }
+      sx={{
+        mt: 8,
+        '& .MuiSnackbarContent-root': {
+          bgcolor: '#1e293b',
+          color: 'white',
+          borderRadius: 2,
+          fontWeight: 500,
+          minWidth: 280,
+        },
+      }}
+    />
+    </>
   );
 }

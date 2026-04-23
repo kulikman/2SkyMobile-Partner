@@ -74,5 +74,35 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Notify project members (best-effort)
+  try {
+    const adminClient = await createAdminClient();
+    const { data: doc } = await adminClient
+      .from('documents').select('title, folder_id').eq('id', ticket_id).single();
+    if (doc) {
+      const { data: folder } = await adminClient
+        .from('folders').select('slug, company_id').eq('id', doc.folder_id).single();
+      let link = `/projects/${doc.folder_id}`;
+      if (folder?.slug && folder.company_id) {
+        const { data: company } = await adminClient
+          .from('companies').select('slug').eq('id', folder.company_id).single();
+        if (company?.slug) link = `/${company.slug}/${folder.slug}`;
+      }
+      const { data: { users: allUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+      const targets = allUsers.filter((u) =>
+        u.id !== user.id &&
+        (u.user_metadata?.role === 'admin' || u.user_metadata?.company_id === folder?.company_id)
+      );
+      await Promise.all(targets.map((t) =>
+        adminClient.from('notifications').insert({
+          user_id: t.id, type: 'new_comment',
+          title: `New comment on issue "${doc.title}"`,
+          body: content.trim().slice(0, 120), link,
+        })
+      ));
+    }
+  } catch { /* best-effort */ }
+
   return NextResponse.json({ ...comment, ticket_id: comment.document_id }, { status: 201 });
 }
