@@ -48,10 +48,10 @@ const MODULES = [
 
 const TYPES = ['Bug', 'Missing Feature', 'Clarification'];
 
-const PRIORITIES: { value: string; label: string; color: 'error' | 'warning' | 'default' }[] = [
-  { value: 'high',   label: 'High',   color: 'error' },
-  { value: 'medium', label: 'Medium', color: 'warning' },
-  { value: 'low',    label: 'Low',    color: 'default' },
+const PRIORITIES: { value: string; label: string; color: string }[] = [
+  { value: 'high',   label: 'High',   color: '#c62828' },
+  { value: 'medium', label: 'Medium', color: '#f57c00' },
+  { value: 'low',    label: 'Low',    color: '#388e3c' },
 ];
 
 const SEVERITIES: { value: string; label: string }[] = [
@@ -60,14 +60,20 @@ const SEVERITIES: { value: string; label: string }[] = [
   { value: 'minor',    label: 'Minor' },
 ];
 
-const STATUSES: { value: string; label: string; color: 'default' | 'warning' | 'info' | 'success' | 'error' | 'secondary' }[] = [
-  { value: 'new',                label: 'New',                color: 'default' },
-  { value: 'in_progress',        label: 'In Progress',        color: 'warning' },
-  { value: 'on_hold',            label: 'On Hold',            color: 'secondary' },
-  { value: 'ready_for_testing',  label: 'Ready for Testing',  color: 'info' },
-  { value: 'approved',           label: 'Approved',           color: 'success' },
-  { value: 'closed',             label: 'Closed',             color: 'error' },
+const STATUSES: { value: string; label: string; color: string }[] = [
+  { value: 'new',               label: 'New',               color: '#9e9e9e' },
+  { value: 'in_progress',       label: 'In Progress',       color: '#1976d2' },
+  { value: 'on_hold',           label: 'On Hold',           color: '#7b1fa2' },
+  { value: 'ready_for_testing', label: 'Ready for Testing', color: '#f57c00' },
+  { value: 'approved',          label: 'Approved',          color: '#388e3c' },
+  { value: 'closed',            label: 'Closed',            color: '#616161' },
 ];
+
+const TYPE_COLORS: Record<string, string> = {
+  'Bug':             '#c62828',
+  'Missing Feature': '#f57c00',
+  'Clarification':   '#1976d2',
+};
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -109,10 +115,26 @@ const EMPTY_FORM: FormState = {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function statusMeta(value: string) {
-  return STATUSES.find((s) => s.value === value) ?? { label: value, color: 'default' as const };
+  return STATUSES.find((s) => s.value === value) ?? { label: value, color: '#9e9e9e' };
 }
 function priorityMeta(value: string) {
-  return PRIORITIES.find((p) => p.value === value) ?? { label: value, color: 'default' as const };
+  return PRIORITIES.find((p) => p.value === value) ?? { label: value, color: '#9e9e9e' };
+}
+
+function ColorChip({ label, color }: { label: string; color: string }) {
+  return (
+    <Chip
+      label={label}
+      size="small"
+      sx={{
+        bgcolor: color + '22',
+        color,
+        fontWeight: 600,
+        fontSize: 11,
+        border: `1px solid ${color}44`,
+      }}
+    />
+  );
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -341,7 +363,7 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
           <TableContainer>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ bgcolor: 'action.hover' }}>
+                <TableRow>
                   <TableCell sx={{ fontWeight: 700, width: 32 }} />
                   <TableCell sx={{ fontWeight: 700 }}>Title</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Module</TableCell>
@@ -389,34 +411,29 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
 
                       <TableCell>
                         {ticket.module && (
-                          <Chip label={ticket.module} size="small" variant="outlined" sx={{ fontSize: 11 }} />
+                          <Chip label={ticket.module} size="small"
+                            sx={{ fontSize: 11, bgcolor: '#9e9e9e22', color: '#616161', border: '1px solid #9e9e9e44', fontWeight: 600 }} />
                         )}
                       </TableCell>
 
                       <TableCell>
                         {ticket.type && (
-                          <Chip
-                            label={ticket.type}
-                            size="small"
-                            color={ticket.type === 'Bug' ? 'error' : ticket.type === 'Missing Feature' ? 'warning' : 'default'}
-                            variant="outlined"
-                            sx={{ fontSize: 11 }}
-                          />
+                          <ColorChip label={ticket.type} color={TYPE_COLORS[ticket.type] ?? '#9e9e9e'} />
                         )}
                       </TableCell>
 
                       <TableCell>
-                        <Chip label={pm.label} size="small" color={pm.color} variant="outlined" sx={{ fontSize: 11 }} />
+                        <ColorChip label={pm.label} color={pm.color} />
                       </TableCell>
 
                       <TableCell>
-                        <Typography variant="caption" sx={{ textTransform: 'capitalize' }}>
+                        <Typography variant="caption" fontWeight={600} sx={{ textTransform: 'capitalize', color: 'text.secondary' }}>
                           {ticket.severity || '—'}
                         </Typography>
                       </TableCell>
 
                       <TableCell>
-                        <Chip label={sm.label} size="small" color={sm.color} sx={{ fontSize: 11 }} />
+                        <ColorChip label={sm.label} color={sm.color} />
                       </TableCell>
 
                       <TableCell>
@@ -470,7 +487,7 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
                     /* Expanded detail row */
                     isOpen && hasDetails ? (
                       <TableRow key={`${ticket.id}-detail`}>
-                        <TableCell colSpan={9} sx={{ pb: 2, pt: 0, bgcolor: 'action.hover' }}>
+                        <TableCell colSpan={9} sx={{ pb: 2, pt: 0, bgcolor: 'grey.50' }}>
                           <Box sx={{ px: 1 }}>
                             <Collapse in={isOpen}>
                               <Stack spacing={1} pt={1}>
@@ -526,7 +543,7 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
 
           {/* Summary */}
           <Divider />
-          <Stack direction="row" spacing={2} sx={{ px: 2.5, py: 1 }} flexWrap="wrap" useFlexGap>
+          <Stack direction="row" spacing={2} sx={{ px: 3, py: 1.5 }} flexWrap="wrap" useFlexGap>
             <Typography variant="caption" color="text.secondary">
               Total: <strong>{filtered.length}</strong>
             </Typography>
@@ -534,8 +551,9 @@ export function IssuesView({ folderId, isAdmin }: { folderId: string; isAdmin: b
               const cnt = filtered.filter((t) => t.status === s.value).length;
               if (!cnt) return null;
               return (
-                <Chip key={s.value} label={`${s.label}: ${cnt}`} size="small"
-                  color={s.color} variant="outlined" sx={{ fontSize: 11 }} />
+                <Typography key={s.value} variant="caption" sx={{ color: s.color }}>
+                  {s.label}: <strong>{cnt}</strong>
+                </Typography>
               );
             })}
           </Stack>
