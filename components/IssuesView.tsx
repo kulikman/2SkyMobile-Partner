@@ -160,6 +160,7 @@ function IssueDrawer({
   currentUser,
   isAdmin,
   sending,
+  updatingStatus,
   onClose,
   onStatusChange,
   onEdit,
@@ -172,25 +173,34 @@ function IssueDrawer({
   currentUser: CurrentUser;
   isAdmin: boolean;
   sending: boolean;
+  updatingStatus: boolean;
   onClose: () => void;
   onStatusChange: (status: string) => void;
   onEdit: () => void;
   onDelete: () => void;
-  onSendComment: (content: string) => void;
+  onSendComment: (content: string) => Promise<void>;
   onOpenScreenshot: (path: string) => void;
 }) {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const [draft, setDraft] = useState('');
+  const [sendError, setSendError] = useState('');
   const sm = statusMeta(ticket.status);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [comments.length]);
 
-  function handleSend() {
+  async function handleSend() {
     if (!draft.trim()) return;
-    onSendComment(draft.trim());
+    setSendError('');
+    const text = draft.trim();
     setDraft('');
+    try {
+      await onSendComment(text);
+    } catch {
+      setSendError('Failed to send. Try again.');
+      setDraft(text); // restore draft on error
+    }
   }
 
   return (
@@ -216,6 +226,7 @@ function IssueDrawer({
               value={ticket.status}
               onChange={(e) => onStatusChange(e.target.value)}
               size="small"
+              disabled={updatingStatus}
               sx={{
                 fontSize: 12, fontWeight: 600, height: 28, color: sm.color,
                 '& .MuiOutlinedInput-notchedOutline': { borderColor: sm.color + '55' },
@@ -376,6 +387,9 @@ function IssueDrawer({
 
       {/* Input — pinned to bottom */}
       <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        {sendError && (
+          <Typography variant="caption" color="error" sx={{ display: 'block', mb: 0.75 }}>{sendError}</Typography>
+        )}
         <Stack direction="row" spacing={1} alignItems="flex-end">
           <TextField
             size="small" multiline maxRows={4} fullWidth
@@ -405,6 +419,7 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [ticketComments, setTicketComments] = useState<Map<string, TicketComment[]>>(new Map());
   const [sendingComment, setSendingComment] = useState<Set<string>>(new Set());
+  const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
 
   // Create / Edit dialog
   const [dialogOpen,  setDialogOpen]  = useState(false);
@@ -438,20 +453,23 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
 
   const sendComment = useCallback(async (ticketId: string, content: string) => {
     setSendingComment((prev) => new Set(prev).add(ticketId));
-    const res = await fetch('/api/ticket-comments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ticket_id: ticketId, content }),
-    });
-    if (res.ok) {
-      const data: TicketComment = await res.json();
-      setTicketComments((prev) => {
-        const next = new Map(prev);
-        next.set(ticketId, [...(prev.get(ticketId) ?? []), data]);
-        return next;
+    try {
+      const res = await fetch('/api/ticket-comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket_id: ticketId, content }),
       });
+      if (res.ok) {
+        const data: TicketComment = await res.json();
+        setTicketComments((prev) => {
+          const next = new Map(prev);
+          next.set(ticketId, [...(prev.get(ticketId) ?? []), data]);
+          return next;
+        });
+      }
+    } finally {
+      setSendingComment((prev) => { const next = new Set(prev); next.delete(ticketId); return next; });
     }
-    setSendingComment((prev) => { const next = new Set(prev); next.delete(ticketId); return next; });
   }, []);
 
   // ── Form helpers ──────────────────────────────────────────────────────────
@@ -505,91 +523,101 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
     if (!form.title.trim()) return;
     setSubmitting(true);
     setFormError('');
+    try {
+      let screenshotPath: string | null = editTarget?.screenshot_path ?? null;
 
-    let screenshotPath: string | null = editTarget?.screenshot_path ?? null;
+      if (screenshotFile) {
+        setUploading(true);
+        try {
+          const res = await fetch('/api/tickets/upload-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: screenshotFile.name }),
+          });
+          const { signedUrl, storagePath, error: urlErr } = await res.json();
+          if (urlErr) throw new Error(urlErr);
+          const supabase = createClient();
+          const { error: uploadErr } = await supabase.storage
+            .from('ticket-screenshots')
+            .uploadToSignedUrl(storagePath, signedUrl, screenshotFile);
+          if (uploadErr) throw new Error(uploadErr.message);
+          screenshotPath = storagePath;
+        } catch (err) {
+          setFormError(err instanceof Error ? err.message : 'Upload failed');
+          return;
+        } finally {
+          setUploading(false);
+        }
+      }
 
-    if (screenshotFile) {
-      setUploading(true);
-      try {
-        const res = await fetch('/api/tickets/upload-url', {
+      const payload = {
+        folder_id:       folderId,
+        title:           form.title.trim(),
+        description:     form.description.trim() || null,
+        url:             form.url.trim() || null,
+        screenshot_path: screenshotPath,
+        module:          form.module || null,
+        type:            form.type || null,
+        priority:        form.priority,
+        severity:        form.severity,
+        comments:        form.comments.trim() || null,
+      };
+
+      if (editTarget) {
+        const res = await fetch(`/api/tickets/${editTarget.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) { setFormError(data.error ?? 'Failed to update'); return; }
+        setTickets((prev) => prev.map((t) => t.id === editTarget.id ? { ...t, ...data } : t));
+      } else {
+        const res = await fetch('/api/tickets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: screenshotFile.name }),
+          body: JSON.stringify(payload),
         });
-        const { signedUrl, storagePath, error: urlErr } = await res.json();
-        if (urlErr) throw new Error(urlErr);
-        const supabase = createClient();
-        const { error: uploadErr } = await supabase.storage
-          .from('ticket-screenshots')
-          .uploadToSignedUrl(storagePath, signedUrl, screenshotFile);
-        if (uploadErr) throw new Error(uploadErr.message);
-        screenshotPath = storagePath;
-      } catch (err) {
-        setFormError(err instanceof Error ? err.message : 'Upload failed');
-        setSubmitting(false);
-        setUploading(false);
-        return;
+        const data = await res.json();
+        if (!res.ok) { setFormError(data.error ?? 'Failed to create ticket'); return; }
+        setTickets((prev) => [data, ...prev]);
       }
-      setUploading(false);
-    }
-
-    const payload = {
-      folder_id:       folderId,
-      title:           form.title.trim(),
-      description:     form.description.trim() || null,
-      url:             form.url.trim() || null,
-      screenshot_path: screenshotPath,
-      module:          form.module || null,
-      type:            form.type || null,
-      priority:        form.priority,
-      severity:        form.severity,
-      comments:        form.comments.trim() || null,
-    };
-
-    if (editTarget) {
-      const res = await fetch(`/api/tickets/${editTarget.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
+      setDialogOpen(false);
+    } catch {
+      setFormError('Unexpected error. Try again.');
+    } finally {
       setSubmitting(false);
-      if (!res.ok) { setFormError(data.error ?? 'Failed to update'); return; }
-      setTickets((prev) => prev.map((t) => t.id === editTarget.id ? { ...t, ...data } : t));
-    } else {
-      const res = await fetch('/api/tickets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      setSubmitting(false);
-      if (!res.ok) { setFormError(data.error ?? 'Failed to create ticket'); return; }
-      setTickets((prev) => [data, ...prev]);
     }
-    setDialogOpen(false);
   }
 
   // ── Status + delete ───────────────────────────────────────────────────────
 
   async function updateStatus(id: string, status: string) {
-    const res = await fetch(`/api/tickets/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setTickets((prev) => prev.map((t) => t.id === id ? { ...t, status: data.status } : t));
+    setUpdatingStatus((prev) => new Set(prev).add(id));
+    try {
+      const res = await fetch(`/api/tickets/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTickets((prev) => prev.map((t) => t.id === id ? { ...t, status: data.status } : t));
+      }
+    } finally {
+      setUpdatingStatus((prev) => { const next = new Set(prev); next.delete(id); return next; });
     }
   }
 
   async function deleteTicket(id: string) {
-    const res = await fetch(`/api/tickets/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      setTickets((prev) => prev.filter((t) => t.id !== id));
-      if (drawerTicketId === id) setDrawerTicketId(null);
-    }
+    if (!window.confirm('Delete this issue? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/tickets/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setTickets((prev) => prev.filter((t) => t.id !== id));
+        if (drawerTicketId === id) setDrawerTicketId(null);
+      }
+    } catch { /* network error — ticket stays */ }
   }
 
   async function openScreenshot(path: string) {
@@ -649,6 +677,7 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
             value={ticket.status}
             onChange={(e) => updateStatus(ticket.id, e.target.value)}
             size="small"
+            disabled={updatingStatus.has(ticket.id)}
             sx={{
               fontSize: 12, fontWeight: 600, height: 28, color: sm.color,
               '& .MuiOutlinedInput-notchedOutline': { borderColor: sm.color + '55' },
@@ -775,6 +804,7 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
             currentUser={currentUser}
             isAdmin={isAdmin}
             sending={sendingComment.has(drawerTicket.id)}
+            updatingStatus={updatingStatus.has(drawerTicket.id)}
             onClose={() => setDrawerTicketId(null)}
             onStatusChange={(status) => updateStatus(drawerTicket.id, status)}
             onEdit={() => { openEdit(drawerTicket); setDrawerTicketId(null); }}

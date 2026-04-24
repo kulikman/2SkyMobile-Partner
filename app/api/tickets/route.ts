@@ -45,8 +45,13 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const { data: { users } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
-  const userMap = new Map(users.map((u) => [u.id, u.email ?? '']));
+  let userMap = new Map<string, string>();
+  try {
+    const { data: listData, error: listError } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+    if (!listError && listData?.users) {
+      userMap = new Map(listData.users.map((u) => [u.id, u.email ?? '']));
+    }
+  } catch { /* best-effort — emails may be missing */ }
 
   const enriched = (data ?? []).map((doc) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

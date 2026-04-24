@@ -185,6 +185,9 @@ function AddScenarioDialog({
     setType('Manual'); setValidates(''); setErr('');
   }
 
+  // Reset form each time dialog opens
+  useEffect(() => { if (open) reset(); }, [open]); // reset is stable (only uses setters)
+
   async function handleSubmit() {
     const mod = moduleVal === '__custom__' ? customModule.trim() : moduleVal.trim();
     if (!mod || !scenario.trim()) { setErr('Module and Scenario are required'); return; }
@@ -309,8 +312,10 @@ function StepDrawer({
 
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
   const [pendingAttachment, setPendingAttachment] = useState<{ url: string; name: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   const stepComments = comments.filter((c) => c.step_id === step.id);
   const sm = STATUS_META[result?.status ?? 'pending'];
@@ -325,13 +330,14 @@ function StepDrawer({
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setUploadError('');
     try {
       const res = await fetch('/api/testing/attachments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName: file.name, contentType: file.type }),
       });
-      if (!res.ok) return;
+      if (!res.ok) { setUploadError('Failed to get upload URL'); return; }
       const { signedUrl, publicUrl } = await res.json();
       const upload = await fetch(signedUrl, {
         method: 'PUT',
@@ -340,7 +346,11 @@ function StepDrawer({
       });
       if (upload.ok) {
         setPendingAttachment({ url: publicUrl, name: file.name });
+      } else {
+        setUploadError('Upload failed. Try again.');
       }
+    } catch {
+      setUploadError('Network error during upload.');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -350,6 +360,7 @@ function StepDrawer({
   async function handleSend() {
     if (!draft.trim() && !pendingAttachment) return;
     setSending(true);
+    setSendError('');
     try {
       const res = await fetch('/api/testing/comments', {
         method: 'POST',
@@ -366,7 +377,11 @@ function StepDrawer({
         onCommentSent(data);
         setDraft('');
         setPendingAttachment(null);
+      } else {
+        setSendError('Failed to send. Try again.');
       }
+    } catch {
+      setSendError('Network error. Try again.');
     } finally {
       setSending(false);
     }
@@ -552,6 +567,13 @@ function StepDrawer({
 
       {/* Input area — pinned to bottom */}
       <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        {/* Error messages */}
+        {uploadError && (
+          <Typography variant="caption" color="error" sx={{ display: 'block', mb: 0.75 }}>{uploadError}</Typography>
+        )}
+        {sendError && (
+          <Typography variant="caption" color="error" sx={{ display: 'block', mb: 0.75 }}>{sendError}</Typography>
+        )}
         {/* Pending attachment preview */}
         {pendingAttachment && (
           <Stack direction="row" alignItems="center" spacing={1}
@@ -655,44 +677,51 @@ export function TestingView({
 
   async function updateStatus(stepId: string, status: string) {
     setUpdatingStatus((prev) => new Set(prev).add(stepId));
-    const res = await fetch('/api/testing/results', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folderId, stepId, status, notes: results.get(stepId)?.notes ?? null }),
-    });
-    if (res.ok) {
-      const data: Result = await res.json();
-      setResults((prev) => new Map(prev).set(stepId, data));
-      // Auto-open drawer when status set to fail
-      if (status === 'fail') {
-        setDrawerStepId(stepId);
+    try {
+      const res = await fetch('/api/testing/results', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderId, stepId, status, notes: results.get(stepId)?.notes ?? null }),
+      });
+      if (res.ok) {
+        const data: Result = await res.json();
+        setResults((prev) => new Map(prev).set(stepId, data));
+        // Auto-open drawer when status set to fail
+        if (status === 'fail') setDrawerStepId(stepId);
       }
+    } finally {
+      setUpdatingStatus((prev) => { const next = new Set(prev); next.delete(stepId); return next; });
     }
-    setUpdatingStatus((prev) => { const next = new Set(prev); next.delete(stepId); return next; });
   }
 
   async function saveNotes(stepId: string) {
     const notes = pendingNotes.get(stepId) ?? results.get(stepId)?.notes ?? '';
     setSavingNotes((prev) => new Set(prev).add(stepId));
-    const res = await fetch('/api/testing/results', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folderId, stepId, status: results.get(stepId)?.status ?? 'pending', notes: notes || null }),
-    });
-    if (res.ok) {
-      const data: Result = await res.json();
-      setResults((prev) => new Map(prev).set(stepId, data));
-      setPendingNotes((prev) => { const next = new Map(prev); next.delete(stepId); return next; });
+    try {
+      const res = await fetch('/api/testing/results', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderId, stepId, status: results.get(stepId)?.status ?? 'pending', notes: notes || null }),
+      });
+      if (res.ok) {
+        const data: Result = await res.json();
+        setResults((prev) => new Map(prev).set(stepId, data));
+        setPendingNotes((prev) => { const next = new Map(prev); next.delete(stepId); return next; });
+      }
+    } finally {
+      setSavingNotes((prev) => { const next = new Set(prev); next.delete(stepId); return next; });
     }
-    setSavingNotes((prev) => { const next = new Set(prev); next.delete(stepId); return next; });
   }
 
   async function deleteCustomStep(id: string) {
-    const res = await fetch(`/api/testing/steps?id=${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      setCustomSteps((prev) => prev.filter((s) => s.id !== id));
-      if (drawerStepId === `custom-${id}`) setDrawerStepId(null);
-    }
+    if (!window.confirm('Delete this custom scenario? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/testing/steps?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setCustomSteps((prev) => prev.filter((s) => s.id !== id));
+        if (drawerStepId === `custom-${id}`) setDrawerStepId(null);
+      }
+    } catch { /* network error — step stays */ }
   }
 
   // Build merged step list per module
