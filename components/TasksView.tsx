@@ -322,7 +322,7 @@ function GroupHeader({ label, count, open, onToggle }: { label: string; count: n
 
 function CommentsDrawer({ task, currentUser, onClose, onCommentAdded }:
   { task: Task | null; currentUser: CurrentUser; onClose: () => void;
-    onCommentAdded: (taskId: string, comment: TaskComment) => void }) {
+    onCommentAdded: (taskId: string) => void }) {
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [text, setText] = useState('');
@@ -360,7 +360,7 @@ function CommentsDrawer({ task, currentUser, onClose, onCommentAdded }:
     if (res.ok) {
       const c = await res.json();
       setComments((prev) => [...prev, c]);
-      onCommentAdded(task!.id, c);
+      onCommentAdded(task!.id);
       setText('');
     }
     setSending(false);
@@ -477,7 +477,7 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, cur
       .catch(() => {});
   }, [folderId]);
 
-  function handleCommentAdded(taskId: string, _comment: TaskComment) {
+  function handleCommentAdded(taskId: string) {
     setCommentCounts((prev) => new Map(prev).set(taskId, (prev.get(taskId) ?? 0) + 1));
   }
 

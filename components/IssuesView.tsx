@@ -131,9 +131,7 @@ const EMPTY_FORM: FormState = {
 function statusMeta(value: string) {
   return STATUSES.find((s) => s.value === value) ?? { label: value, color: '#9e9e9e' };
 }
-function priorityMeta(value: string) {
-  return PRIORITIES.find((p) => p.value === value) ?? { label: value, color: '#9e9e9e' };
-}
+
 
 function TypeChip({ type }: { type: string | null }) {
   if (!type) return null;

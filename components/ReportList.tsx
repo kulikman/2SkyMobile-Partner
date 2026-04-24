@@ -34,11 +34,6 @@ export type ReportDoc = {
   created_at: string;
 };
 
-const reportTypeLabels: Record<string, string> = {
-  weekly: 'Weekly',
-  biweekly: 'Biweekly',
-  milestone: 'Milestone',
-};
 
 function slugify(text: string) {
   return text

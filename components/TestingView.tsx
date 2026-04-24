@@ -8,7 +8,6 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
-import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Select from '@mui/material/Select';
@@ -232,12 +231,6 @@ export function TestingView({ folderId, currentUser }: { folderId: string; curre
   }
 
   // ── Progress ────────────────────────────────────────────────────────────────
-
-  const total = STEPS.length;
-  const passed = STEPS.filter((s) => results.get(s.id)?.status === 'pass').length;
-  const failed = STEPS.filter((s) => results.get(s.id)?.status === 'fail').length;
-  const blocked = STEPS.filter((s) => results.get(s.id)?.status === 'blocked').length;
-  const progressPct = total > 0 ? Math.round((passed / total) * 100) : 0;
 
   if (loading) return <CircularProgress size={24} />;
 
