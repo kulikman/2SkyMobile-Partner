@@ -5,8 +5,12 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
-import Collapse from '@mui/material/Collapse';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
+import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
@@ -19,16 +23,30 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import AddIcon from '@mui/icons-material/Add';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import ChatBubbleIcon from '@mui/icons-material/ChatBubble';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SendIcon from '@mui/icons-material/Send';
 
-// ── Static test-step data (seeded from platform-testing-flows-2026-04-22.xlsx) ─
+// ── Static test-step data ─────────────────────────────────────────────────────
 
-type Step = { id: string; module: string; scenario: string; type: 'Automated' | 'Manual'; roles: string; validates: string };
+type Step = {
+  id: string;
+  module: string;
+  scenario: string;
+  type: 'Automated' | 'Manual';
+  roles: string;
+  validates: string;
+  isCustom?: boolean;
+};
 
 const STEPS: Step[] = [
   { id:'1',  module:'Authentication', scenario:'Login with valid credentials', type:'Automated', roles:'superAdmin, admin, partnerAdmin, partnerUser', validates:'HTTP 200; response contains token + refreshToken + permissions + userProfile' },
@@ -115,8 +133,6 @@ const STEPS: Step[] = [
   { id:'82', module:'Health', scenario:'Service availability', type:'Automated', roles:'Public', validates:'HTTP 200 or 503 — service responds' },
 ];
 
-const MODULES = Array.from(new Set(STEPS.map((s) => s.module)));
-
 // ── Status config ─────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
@@ -129,51 +145,505 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Result = { step_id: string; status: string; notes: string | null; updated_by: string | null; updated_at: string };
-type Comment = { id: string; step_id: string | null; author_email: string; message: string; created_at: string };
+type Comment = { id: string; step_id: string | null; author_email: string; message: string; attachment_url: string | null; created_at: string };
+type CustomStep = { id: string; module: string; scenario: string; type: 'Automated' | 'Manual'; validates: string; created_at: string };
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-export function TestingView({ folderId, currentUser }: { folderId: string; currentUser: { email: string } }) {
+function isImageUrl(url: string) {
+  return /\.(png|jpe?g|gif|webp|svg|bmp)(\?.*)?$/i.test(url);
+}
+
+// ── Add Scenario Dialog ───────────────────────────────────────────────────────
+
+const STATIC_MODULES = Array.from(new Set(STEPS.map((s) => s.module)));
+
+function AddScenarioDialog({
+  open,
+  folderId,
+  existingModules,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  folderId: string;
+  existingModules: string[];
+  onClose: () => void;
+  onCreated: (step: CustomStep) => void;
+}) {
+  const allModules = Array.from(new Set([...STATIC_MODULES, ...existingModules]));
+  const [moduleVal, setModuleVal] = useState('');
+  const [customModule, setCustomModule] = useState('');
+  const [scenario, setScenario] = useState('');
+  const [type, setType] = useState<'Automated' | 'Manual'>('Manual');
+  const [validates, setValidates] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  function reset() {
+    setModuleVal(''); setCustomModule(''); setScenario('');
+    setType('Manual'); setValidates(''); setErr('');
+  }
+
+  async function handleSubmit() {
+    const mod = moduleVal === '__custom__' ? customModule.trim() : moduleVal.trim();
+    if (!mod || !scenario.trim()) { setErr('Module and Scenario are required'); return; }
+    setSaving(true);
+    setErr('');
+    try {
+      const res = await fetch('/api/testing/steps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderId, module: mod, scenario: scenario.trim(), type, validates: validates.trim() }),
+      });
+      if (!res.ok) { const d = await res.json(); setErr(d.error ?? 'Error'); return; }
+      const data: CustomStep = await res.json();
+      onCreated(data);
+      reset();
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontWeight: 700 }}>Add Scenario</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2.5} sx={{ mt: 1 }}>
+          {err && <Typography color="error" variant="caption">{err}</Typography>}
+
+          <Box>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>Module *</Typography>
+            <Select
+              value={moduleVal}
+              onChange={(e) => setModuleVal(e.target.value)}
+              displayEmpty
+              size="small"
+              fullWidth
+            >
+              <MenuItem value="" disabled><em>Select module…</em></MenuItem>
+              {allModules.map((m) => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+              <MenuItem value="__custom__">+ New module…</MenuItem>
+            </Select>
+            {moduleVal === '__custom__' && (
+              <TextField
+                size="small" fullWidth sx={{ mt: 1 }}
+                placeholder="Module name"
+                value={customModule}
+                onChange={(e) => setCustomModule(e.target.value)}
+              />
+            )}
+          </Box>
+
+          <Box>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>Scenario *</Typography>
+            <TextField size="small" fullWidth multiline minRows={2} placeholder="Describe the test scenario"
+              value={scenario} onChange={(e) => setScenario(e.target.value)} />
+          </Box>
+
+          <Box>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>Type</Typography>
+            <Select value={type} onChange={(e) => setType(e.target.value as 'Automated' | 'Manual')} size="small" fullWidth>
+              <MenuItem value="Manual">Manual</MenuItem>
+              <MenuItem value="Automated">Automated</MenuItem>
+            </Select>
+          </Box>
+
+          <Box>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>Validates (acceptance criteria)</Typography>
+            <TextField size="small" fullWidth multiline minRows={2} placeholder="What this test validates…"
+              value={validates} onChange={(e) => setValidates(e.target.value)} />
+          </Box>
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button variant="contained" onClick={handleSubmit} disabled={saving}>
+          {saving ? <CircularProgress size={16} color="inherit" /> : 'Add Scenario'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ── Step Drawer ───────────────────────────────────────────────────────────────
+
+function StepDrawer({
+  step,
+  folderId,
+  result,
+  comments,
+  pendingNotes,
+  savingNotes,
+  updatingStatus,
+  currentUser,
+  isAdmin,
+  isCustom,
+  onClose,
+  onStatusChange,
+  onNotesChange,
+  onSaveNotes,
+  onCommentSent,
+  onDeleteStep,
+}: {
+  step: Step;
+  folderId: string;
+  result: Result | undefined;
+  comments: Comment[];
+  pendingNotes: string | undefined;
+  savingNotes: boolean;
+  updatingStatus: boolean;
+  currentUser: { email: string };
+  isAdmin: boolean;
+  isCustom: boolean;
+  onClose: () => void;
+  onStatusChange: (status: string) => void;
+  onNotesChange: (val: string) => void;
+  onSaveNotes: () => void;
+  onCommentSent: (comment: Comment) => void;
+  onDeleteStep: () => void;
+}) {
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState<{ url: string; name: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const stepComments = comments.filter((c) => c.step_id === step.id);
+  const sm = STATUS_META[result?.status ?? 'pending'];
+  const notesVal = pendingNotes !== undefined ? pendingNotes : (result?.notes ?? '');
+  const notesDirty = pendingNotes !== undefined && pendingNotes !== (result?.notes ?? '');
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [stepComments.length]);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await fetch('/api/testing/attachments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, contentType: file.type }),
+      });
+      if (!res.ok) return;
+      const { signedUrl, publicUrl } = await res.json();
+      const upload = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+      if (upload.ok) {
+        setPendingAttachment({ url: publicUrl, name: file.name });
+      }
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function handleSend() {
+    if (!draft.trim() && !pendingAttachment) return;
+    setSending(true);
+    try {
+      const res = await fetch('/api/testing/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          folderId,
+          stepId: step.id,
+          message: draft.trim(),
+          attachmentUrl: pendingAttachment?.url ?? null,
+        }),
+      });
+      if (res.ok) {
+        const data: Comment = await res.json();
+        onCommentSent(data);
+        setDraft('');
+        setPendingAttachment(null);
+      }
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <Box sx={{ width: 420, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Header */}
+      <Box sx={{ px: 2.5, pt: 2.5, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        <Stack direction="row" alignItems="flex-start" spacing={1}>
+          <Box flex={1}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+              <Chip
+                label={step.type}
+                size="small"
+                sx={{
+                  fontSize: 10, fontWeight: 700, height: 20, borderRadius: '999px',
+                  bgcolor: step.type === 'Automated' ? '#1976d211' : '#f57c0011',
+                  color: step.type === 'Automated' ? '#1976d2' : '#f57c00',
+                }}
+              />
+              {isCustom && (
+                <Chip label="custom" size="small" sx={{ fontSize: 10, height: 20, bgcolor: '#7b1fa211', color: '#7b1fa2' }} />
+              )}
+            </Stack>
+            <Typography variant="body2" fontWeight={700} sx={{ lineHeight: 1.4, mb: 0.5 }}>
+              {step.scenario}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              {step.module}
+            </Typography>
+            {/* Status inline */}
+            <Select
+              value={result?.status ?? 'pending'}
+              onChange={(e) => onStatusChange(e.target.value)}
+              size="small"
+              disabled={updatingStatus}
+              sx={{
+                fontSize: 12, fontWeight: 600, height: 28, color: sm.color,
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: sm.color + '55' },
+                '& .MuiSelect-icon': { color: sm.color },
+              }}
+            >
+              {Object.entries(STATUS_META).map(([val, meta]) => (
+                <MenuItem key={val} value={val} sx={{ fontSize: 12 }}>{meta.label}</MenuItem>
+              ))}
+            </Select>
+          </Box>
+          <Stack direction="row" alignItems="center">
+            {isCustom && isAdmin && (
+              <Tooltip title="Delete scenario">
+                <IconButton size="small" onClick={onDeleteStep} sx={{ color: 'error.main', mr: 0.5 }}>
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            <IconButton size="small" onClick={onClose}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+        </Stack>
+      </Box>
+
+      {/* Scrollable body */}
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 2.5, py: 2 }}>
+        <Stack spacing={2}>
+
+          {/* Validates */}
+          {step.validates && (
+            <Box>
+              <Typography variant="caption" fontWeight={700} color="text.secondary"
+                sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', mb: 0.5 }}>
+                Validates
+              </Typography>
+              <Typography variant="caption" color="text.secondary">{step.validates}</Typography>
+            </Box>
+          )}
+
+          {/* Roles */}
+          {'roles' in step && (step as Step).roles && (
+            <Box>
+              <Typography variant="caption" fontWeight={700} color="text.secondary"
+                sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', mb: 0.5 }}>
+                Roles
+              </Typography>
+              <Typography variant="caption" color="text.secondary">{(step as Step).roles}</Typography>
+            </Box>
+          )}
+
+          <Divider />
+
+          {/* Notes */}
+          <Box>
+            <Typography variant="caption" fontWeight={700} color="text.secondary"
+              sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', mb: 1 }}>
+              Notes
+            </Typography>
+            <TextField
+              size="small" multiline minRows={2} maxRows={5} fullWidth
+              placeholder="Add notes about this test step…"
+              value={notesVal}
+              onChange={(e) => onNotesChange(e.target.value)}
+            />
+            {notesDirty && (
+              <Button size="small" variant="contained" disabled={savingNotes} onClick={onSaveNotes} sx={{ mt: 1 }}>
+                {savingNotes ? <CircularProgress size={14} color="inherit" /> : 'Save Notes'}
+              </Button>
+            )}
+          </Box>
+
+          <Divider />
+
+          {/* Chat */}
+          <Box>
+            <Typography variant="caption" fontWeight={700} color="text.secondary"
+              sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', mb: 1.5 }}>
+              Comments
+            </Typography>
+
+            {stepComments.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                No comments yet.
+              </Typography>
+            ) : (
+              <Stack spacing={1.5} sx={{ mb: 1 }}>
+                {stepComments.map((c) => {
+                  const isMe = c.author_email === currentUser.email;
+                  return (
+                    <Stack key={c.id} direction="row" justifyContent={isMe ? 'flex-end' : 'flex-start'}>
+                      <Box sx={{
+                        maxWidth: '85%',
+                        bgcolor: isMe ? '#1565c0' : 'white',
+                        color: isMe ? 'white' : 'text.primary',
+                        border: isMe ? 'none' : '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                        px: 1.5, py: 1,
+                      }}>
+                        {!isMe && (
+                          <Typography variant="caption" fontWeight={700} sx={{ display: 'block', mb: 0.25, opacity: 0.7 }}>
+                            {c.author_email}
+                          </Typography>
+                        )}
+                        {c.message && (
+                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                            {c.message}
+                          </Typography>
+                        )}
+                        {c.attachment_url && (
+                          <Box sx={{ mt: c.message ? 0.75 : 0 }}>
+                            {isImageUrl(c.attachment_url) ? (
+                              <Box
+                                component="img"
+                                src={c.attachment_url}
+                                alt="attachment"
+                                sx={{ maxWidth: '100%', maxHeight: 200, borderRadius: 1, display: 'block', cursor: 'pointer' }}
+                                onClick={() => window.open(c.attachment_url!, '_blank')}
+                              />
+                            ) : (
+                              <Stack direction="row" alignItems="center" spacing={0.5}
+                                component="a" href={c.attachment_url} target="_blank" rel="noopener noreferrer"
+                                sx={{ color: isMe ? '#90caf9' : 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>
+                                <AttachFileIcon sx={{ fontSize: 14 }} />
+                                <Typography variant="caption">Attachment</Typography>
+                                <OpenInNewIcon sx={{ fontSize: 12 }} />
+                              </Stack>
+                            )}
+                          </Box>
+                        )}
+                        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.6, fontSize: 10 }}>
+                          {new Date(c.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  );
+                })}
+                <div ref={chatEndRef} />
+              </Stack>
+            )}
+          </Box>
+        </Stack>
+      </Box>
+
+      {/* Input area — pinned to bottom */}
+      <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        {/* Pending attachment preview */}
+        {pendingAttachment && (
+          <Stack direction="row" alignItems="center" spacing={1}
+            sx={{ mb: 1, bgcolor: 'action.hover', borderRadius: 1, px: 1.5, py: 0.75 }}>
+            <AttachFileIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+            <Typography variant="caption" flex={1} noWrap>{pendingAttachment.name}</Typography>
+            <IconButton size="small" onClick={() => setPendingAttachment(null)}>
+              <CloseIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Stack>
+        )}
+
+        <Stack direction="row" spacing={1} alignItems="flex-end">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
+            style={{ display: 'none' }}
+            onChange={handleFileChange}
+          />
+          <Tooltip title="Attach file or screenshot">
+            <span>
+              <IconButton size="small" disabled={uploading} onClick={() => fileInputRef.current?.click()}
+                sx={{ color: 'text.secondary', mb: 0.25 }}>
+                {uploading ? <CircularProgress size={16} /> : <AttachFileIcon fontSize="small" />}
+              </IconButton>
+            </span>
+          </Tooltip>
+
+          <TextField
+            size="small" multiline maxRows={4} fullWidth
+            placeholder="Write a comment…"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+            }}
+          />
+
+          <IconButton
+            color="primary"
+            disabled={(!draft.trim() && !pendingAttachment) || sending}
+            onClick={handleSend}
+            sx={{ mb: 0.25, flexShrink: 0 }}
+          >
+            {sending ? <CircularProgress size={18} color="inherit" /> : <SendIcon fontSize="small" />}
+          </IconButton>
+        </Stack>
+      </Box>
+    </Box>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export function TestingView({
+  folderId,
+  currentUser,
+  isAdmin,
+}: {
+  folderId: string;
+  currentUser: { email: string };
+  isAdmin: boolean;
+}) {
   const [results, setResults] = useState<Map<string, Result>>(new Map());
   const [comments, setComments] = useState<Comment[]>([]);
+  const [customSteps, setCustomSteps] = useState<CustomStep[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [collapsedModules, setCollapsedModules] = useState<Set<string>>(new Set());
-  const [expandedStep, setExpandedStep] = useState<string | null>(null);
+  const [drawerStepId, setDrawerStepId] = useState<string | null>(null);
 
-  // per-step pending notes (before save)
   const [pendingNotes, setPendingNotes] = useState<Map<string, string>>(new Map());
   const [savingNotes, setSavingNotes] = useState<Set<string>>(new Set());
-
-  // per-step new comment draft
-  const [commentDraft, setCommentDraft] = useState<Map<string, string>>(new Map());
-  const [sendingComment, setSendingComment] = useState<Set<string>>(new Set());
-
-  // status update loading
   const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
 
-  const chatEndRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const [addScenarioOpen, setAddScenarioOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([
       fetch(`/api/testing/results?folderId=${folderId}`).then((r) => r.json()),
       fetch(`/api/testing/comments?folderId=${folderId}`).then((r) => r.json()),
-    ]).then(([r, c]) => {
+      fetch(`/api/testing/steps?folderId=${folderId}`).then((r) => r.json()),
+    ]).then(([r, c, s]) => {
       const map = new Map<string, Result>();
       if (Array.isArray(r)) r.forEach((item: Result) => map.set(item.step_id, item));
       setResults(map);
       setComments(Array.isArray(c) ? c : []);
+      setCustomSteps(Array.isArray(s) ? s : []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [folderId]);
-
-  // scroll chat to bottom when step expands or new comment arrives
-  useEffect(() => {
-    if (expandedStep) {
-      const el = chatEndRefs.current.get(expandedStep);
-      el?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [expandedStep, comments]);
 
   function toggleModule(mod: string) {
     setCollapsedModules((prev) => {
@@ -193,6 +663,10 @@ export function TestingView({ folderId, currentUser }: { folderId: string; curre
     if (res.ok) {
       const data: Result = await res.json();
       setResults((prev) => new Map(prev).set(stepId, data));
+      // Auto-open drawer when status set to fail
+      if (status === 'fail') {
+        setDrawerStepId(stepId);
+      }
     }
     setUpdatingStatus((prev) => { const next = new Set(prev); next.delete(stepId); return next; });
   }
@@ -213,29 +687,50 @@ export function TestingView({ folderId, currentUser }: { folderId: string; curre
     setSavingNotes((prev) => { const next = new Set(prev); next.delete(stepId); return next; });
   }
 
-  async function sendComment(stepId: string) {
-    const message = (commentDraft.get(stepId) ?? '').trim();
-    if (!message) return;
-    setSendingComment((prev) => new Set(prev).add(stepId));
-    const res = await fetch('/api/testing/comments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folderId, stepId, message }),
-    });
+  async function deleteCustomStep(id: string) {
+    const res = await fetch(`/api/testing/steps?id=${id}`, { method: 'DELETE' });
     if (res.ok) {
-      const data: Comment = await res.json();
-      setComments((prev) => [...prev, data]);
-      setCommentDraft((prev) => { const next = new Map(prev); next.set(stepId, ''); return next; });
+      setCustomSteps((prev) => prev.filter((s) => s.id !== id));
+      if (drawerStepId === `custom-${id}`) setDrawerStepId(null);
     }
-    setSendingComment((prev) => { const next = new Set(prev); next.delete(stepId); return next; });
   }
 
-  // ── Progress ────────────────────────────────────────────────────────────────
+  // Build merged step list per module
+  const allModules = Array.from(new Set([
+    ...STEPS.map((s) => s.module),
+    ...customSteps.map((s) => s.module),
+  ]));
+
+  const customModules = Array.from(new Set(customSteps.map((s) => s.module)));
+
+  const drawerStep: Step | null = drawerStepId
+    ? (() => {
+        if (drawerStepId.startsWith('custom-')) {
+          const cs = customSteps.find((s) => `custom-${s.id}` === drawerStepId);
+          if (!cs) return null;
+          return { id: `custom-${cs.id}`, module: cs.module, scenario: cs.scenario, type: cs.type, roles: '', validates: cs.validates, isCustom: true };
+        }
+        return STEPS.find((s) => s.id === drawerStepId) ?? null;
+      })()
+    : null;
 
   if (loading) return <CircularProgress size={24} />;
 
   return (
     <Box>
+      {/* Header */}
+      <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          size="small"
+          onClick={() => setAddScenarioOpen(true)}
+          sx={{ textTransform: 'none', fontWeight: 600 }}
+        >
+          Add Scenario
+        </Button>
+      </Stack>
+
       {/* Table */}
       <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
         <TableContainer>
@@ -251,10 +746,12 @@ export function TestingView({ folderId, currentUser }: { folderId: string; curre
             </TableHead>
 
             <TableBody>
-              {MODULES.map((mod) => {
-                const modSteps = STEPS.filter((s) => s.module === mod);
+              {allModules.map((mod) => {
+                const staticSteps = STEPS.filter((s) => s.module === mod);
+                const modCustomSteps = customSteps.filter((s) => s.module === mod);
                 const isCollapsed = collapsedModules.has(mod);
-                const modPassed = modSteps.filter((s) => results.get(s.id)?.status === 'pass').length;
+                const allModSteps = [...staticSteps.map((s) => s.id), ...modCustomSteps.map((s) => `custom-${s.id}`)];
+                const modPassed = allModSteps.filter((id) => results.get(id)?.status === 'pass').length;
 
                 return [
                   /* Module header */
@@ -273,71 +770,53 @@ export function TestingView({ folderId, currentUser }: { folderId: string; curre
                         <Typography sx={{ color: 'white', fontWeight: 700, fontSize: 13, flex: 1 }}>
                           {mod}
                         </Typography>
-                        {modPassed > 0 && (
-                          <CheckCircleIcon sx={{ color: '#a5d6a7', fontSize: 16 }} />
-                        )}
+                        {modPassed > 0 && <CheckCircleIcon sx={{ color: '#a5d6a7', fontSize: 16 }} />}
                         <Box sx={{
                           bgcolor: 'white', borderRadius: '50%', width: 22, height: 22,
                           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                         }}>
                           <Typography sx={{ color: '#1565c0', fontWeight: 800, fontSize: 11, lineHeight: 1 }}>
-                            {modSteps.length}
+                            {allModSteps.length}
                           </Typography>
                         </Box>
                       </Stack>
                     </TableCell>
                   </TableRow>,
 
-                  /* Step rows */
-                  ...(!isCollapsed ? modSteps.flatMap((step) => {
+                  /* Static step rows */
+                  ...(!isCollapsed ? staticSteps.map((step) => {
                     const result = results.get(step.id);
                     const sm = STATUS_META[result?.status ?? 'pending'];
-                    const isExpanded = expandedStep === step.id;
                     const stepComments = comments.filter((c) => c.step_id === step.id);
                     const hasComments = stepComments.length > 0;
-                    const notesVal = pendingNotes.has(step.id)
-                      ? (pendingNotes.get(step.id) ?? '')
-                      : (result?.notes ?? '');
-                    const notesDirty = pendingNotes.has(step.id) && pendingNotes.get(step.id) !== (result?.notes ?? '');
 
-                    return [
+                    return (
                       <TableRow
                         key={step.id}
                         hover
-                        onClick={() => setExpandedStep(isExpanded ? null : step.id)}
-                        sx={{ cursor: 'pointer', '& td': { borderBottom: isExpanded ? 'none' : undefined } }}
+                        onClick={() => setDrawerStepId(step.id)}
+                        sx={{ cursor: 'pointer' }}
                       >
-                        {/* # */}
                         <TableCell sx={{ px: 1.5, py: 1, color: 'text.disabled', fontSize: 11, fontWeight: 600 }}>
                           {step.id}
                         </TableCell>
-
-                        {/* Scenario */}
                         <TableCell sx={{ py: 1 }}>
                           <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1.4 }}>
                             {step.scenario}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', mt: 0.25, maxWidth: 400 }}>
+                          <Typography variant="caption" color="text.secondary" noWrap
+                            sx={{ display: 'block', mt: 0.25, maxWidth: 400 }}>
                             {step.validates}
                           </Typography>
                         </TableCell>
-
-                        {/* Type chip */}
                         <TableCell sx={{ py: 1 }}>
-                          <Chip
-                            label={step.type}
-                            size="small"
-                            variant="outlined"
-                            sx={{
-                              fontSize: 11, fontWeight: 600, height: 22, borderRadius: '999px',
-                              borderColor: step.type === 'Automated' ? '#1976d244' : '#f57c0044',
-                              color: step.type === 'Automated' ? '#1976d2' : '#f57c00',
-                              bgcolor: step.type === 'Automated' ? '#1976d211' : '#f57c0011',
-                            }}
-                          />
+                          <Chip label={step.type} size="small" variant="outlined" sx={{
+                            fontSize: 11, fontWeight: 600, height: 22, borderRadius: '999px',
+                            borderColor: step.type === 'Automated' ? '#1976d244' : '#f57c0044',
+                            color: step.type === 'Automated' ? '#1976d2' : '#f57c00',
+                            bgcolor: step.type === 'Automated' ? '#1976d211' : '#f57c0011',
+                          }} />
                         </TableCell>
-
-                        {/* Status select */}
                         <TableCell sx={{ py: 1 }} onClick={(e) => e.stopPropagation()}>
                           <Select
                             value={result?.status ?? 'pending'}
@@ -355,12 +834,10 @@ export function TestingView({ folderId, currentUser }: { folderId: string; curre
                             ))}
                           </Select>
                         </TableCell>
-
-                        {/* Chat icon */}
                         <TableCell sx={{ py: 1 }} onClick={(e) => e.stopPropagation()}>
                           <IconButton
                             size="small"
-                            onClick={() => setExpandedStep(isExpanded ? null : step.id)}
+                            onClick={() => setDrawerStepId(step.id)}
                             sx={{ color: hasComments ? '#1976d2' : 'text.disabled' }}
                           >
                             {hasComments
@@ -369,141 +846,78 @@ export function TestingView({ folderId, currentUser }: { folderId: string; curre
                             }
                           </IconButton>
                         </TableCell>
-                      </TableRow>,
+                      </TableRow>
+                    );
+                  }) : []),
 
-                      /* Expanded notes + chat panel */
-                      isExpanded ? (
-                        <TableRow key={`${step.id}-chat`}>
-                          <TableCell colSpan={5} sx={{ p: 0, bgcolor: '#f8fafc' }}>
-                            <Collapse in={isExpanded}>
-                              <Box sx={{ px: 3, py: 2 }}>
-                                <Stack spacing={2}>
+                  /* Custom step rows */
+                  ...(!isCollapsed ? modCustomSteps.map((cs) => {
+                    const stepId = `custom-${cs.id}`;
+                    const result = results.get(stepId);
+                    const sm = STATUS_META[result?.status ?? 'pending'];
+                    const stepComments = comments.filter((c) => c.step_id === stepId);
+                    const hasComments = stepComments.length > 0;
 
-                                  {/* Roles info */}
-                                  <Typography variant="caption" color="text.secondary">
-                                    <strong>Roles:</strong> {step.roles}
-                                  </Typography>
-
-                                  <Divider />
-
-                                  {/* Notes */}
-                                  <Box>
-                                    <Typography variant="caption" fontWeight={700} color="text.secondary"
-                                      sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', mb: 1 }}>
-                                      Notes
-                                    </Typography>
-                                    <Stack direction="row" spacing={1} alignItems="flex-start">
-                                      <TextField
-                                        size="small"
-                                        multiline
-                                        minRows={2}
-                                        maxRows={5}
-                                        fullWidth
-                                        placeholder="Add notes about this test step…"
-                                        value={notesVal}
-                                        onChange={(e) => setPendingNotes((prev) => new Map(prev).set(step.id, e.target.value))}
-                                      />
-                                      {notesDirty && (
-                                        <Button
-                                          size="small"
-                                          variant="contained"
-                                          disabled={savingNotes.has(step.id)}
-                                          onClick={() => saveNotes(step.id)}
-                                          sx={{ flexShrink: 0, mt: 0.5 }}
-                                        >
-                                          {savingNotes.has(step.id) ? <CircularProgress size={14} color="inherit" /> : 'Save'}
-                                        </Button>
-                                      )}
-                                    </Stack>
-                                  </Box>
-
-                                  <Divider />
-
-                                  {/* Chat */}
-                                  <Box>
-                                    <Typography variant="caption" fontWeight={700} color="text.secondary"
-                                      sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', mb: 1 }}>
-                                      Comments
-                                    </Typography>
-
-                                    {stepComments.length === 0 ? (
-                                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                                        No comments yet. Be the first to leave a comment.
-                                      </Typography>
-                                    ) : (
-                                      <Stack spacing={1.5} sx={{ mb: 1.5, maxHeight: 280, overflowY: 'auto', pr: 0.5 }}>
-                                        {stepComments.map((c) => {
-                                          const isMe = c.author_email === currentUser.email;
-                                          return (
-                                            <Stack key={c.id} direction="row" spacing={1} justifyContent={isMe ? 'flex-end' : 'flex-start'}>
-                                              <Box
-                                                sx={{
-                                                  maxWidth: '75%',
-                                                  bgcolor: isMe ? '#1565c0' : 'white',
-                                                  color: isMe ? 'white' : 'text.primary',
-                                                  border: isMe ? 'none' : '1px solid',
-                                                  borderColor: 'divider',
-                                                  borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                                                  px: 1.5, py: 1,
-                                                }}
-                                              >
-                                                {!isMe && (
-                                                  <Typography variant="caption" fontWeight={700} sx={{ display: 'block', mb: 0.25, opacity: 0.7 }}>
-                                                    {c.author_email}
-                                                  </Typography>
-                                                )}
-                                                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                                                  {c.message}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.6, fontSize: 10 }}>
-                                                  {new Date(c.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                </Typography>
-                                              </Box>
-                                            </Stack>
-                                          );
-                                        })}
-                                        <div ref={(el) => { chatEndRefs.current.set(step.id, el); }} />
-                                      </Stack>
-                                    )}
-
-                                    {/* New comment input */}
-                                    <Stack direction="row" spacing={1} alignItems="flex-end">
-                                      <TextField
-                                        size="small"
-                                        multiline
-                                        maxRows={4}
-                                        fullWidth
-                                        placeholder="Write a comment…"
-                                        value={commentDraft.get(step.id) ?? ''}
-                                        onChange={(e) => setCommentDraft((prev) => new Map(prev).set(step.id, e.target.value))}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault();
-                                            sendComment(step.id);
-                                          }
-                                        }}
-                                      />
-                                      <IconButton
-                                        color="primary"
-                                        disabled={!(commentDraft.get(step.id) ?? '').trim() || sendingComment.has(step.id)}
-                                        onClick={() => sendComment(step.id)}
-                                        sx={{ mb: 0.25, flexShrink: 0 }}
-                                      >
-                                        {sendingComment.has(step.id)
-                                          ? <CircularProgress size={18} color="inherit" />
-                                          : <SendIcon fontSize="small" />
-                                        }
-                                      </IconButton>
-                                    </Stack>
-                                  </Box>
-
-                                </Stack>
-                              </Box>
-                            </Collapse>
-                          </TableCell>
-                        </TableRow>
-                      ) : null,
-                    ];
+                    return (
+                      <TableRow
+                        key={stepId}
+                        hover
+                        onClick={() => setDrawerStepId(stepId)}
+                        sx={{ cursor: 'pointer', bgcolor: '#f8f4ff' }}
+                      >
+                        <TableCell sx={{ px: 1.5, py: 1 }}>
+                          <Chip label="new" size="small" sx={{ fontSize: 10, height: 18, bgcolor: '#7b1fa211', color: '#7b1fa2' }} />
+                        </TableCell>
+                        <TableCell sx={{ py: 1 }}>
+                          <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1.4 }}>
+                            {cs.scenario}
+                          </Typography>
+                          {cs.validates && (
+                            <Typography variant="caption" color="text.secondary" noWrap
+                              sx={{ display: 'block', mt: 0.25, maxWidth: 400 }}>
+                              {cs.validates}
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell sx={{ py: 1 }}>
+                          <Chip label={cs.type} size="small" variant="outlined" sx={{
+                            fontSize: 11, fontWeight: 600, height: 22, borderRadius: '999px',
+                            borderColor: cs.type === 'Automated' ? '#1976d244' : '#f57c0044',
+                            color: cs.type === 'Automated' ? '#1976d2' : '#f57c00',
+                            bgcolor: cs.type === 'Automated' ? '#1976d211' : '#f57c0011',
+                          }} />
+                        </TableCell>
+                        <TableCell sx={{ py: 1 }} onClick={(e) => e.stopPropagation()}>
+                          <Select
+                            value={result?.status ?? 'pending'}
+                            onChange={(e) => updateStatus(stepId, e.target.value)}
+                            size="small"
+                            disabled={updatingStatus.has(stepId)}
+                            sx={{
+                              fontSize: 12, fontWeight: 600, height: 28, color: sm.color,
+                              '& .MuiOutlinedInput-notchedOutline': { borderColor: sm.color + '55' },
+                              '& .MuiSelect-icon': { color: sm.color },
+                            }}
+                          >
+                            {Object.entries(STATUS_META).map(([val, meta]) => (
+                              <MenuItem key={val} value={val} sx={{ fontSize: 12 }}>{meta.label}</MenuItem>
+                            ))}
+                          </Select>
+                        </TableCell>
+                        <TableCell sx={{ py: 1 }} onClick={(e) => e.stopPropagation()}>
+                          <IconButton
+                            size="small"
+                            onClick={() => setDrawerStepId(stepId)}
+                            sx={{ color: hasComments ? '#1976d2' : 'text.disabled' }}
+                          >
+                            {hasComments
+                              ? <ChatBubbleIcon sx={{ fontSize: 16 }} />
+                              : <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
+                            }
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    );
                   }) : []),
                 ];
               })}
@@ -511,6 +925,49 @@ export function TestingView({ folderId, currentUser }: { folderId: string; curre
           </Table>
         </TableContainer>
       </Paper>
+
+      {/* Right-side comments drawer */}
+      <Drawer
+        anchor="right"
+        open={!!drawerStepId && !!drawerStep}
+        onClose={() => setDrawerStepId(null)}
+        PaperProps={{ sx: { width: 420, boxShadow: 6 } }}
+      >
+        {drawerStep && (
+          <StepDrawer
+            step={drawerStep}
+            folderId={folderId}
+            result={results.get(drawerStep.id)}
+            comments={comments}
+            pendingNotes={pendingNotes.get(drawerStep.id)}
+            savingNotes={savingNotes.has(drawerStep.id)}
+            updatingStatus={updatingStatus.has(drawerStep.id)}
+            currentUser={currentUser}
+            isAdmin={isAdmin}
+            isCustom={!!drawerStep.isCustom}
+            onClose={() => setDrawerStepId(null)}
+            onStatusChange={(status) => updateStatus(drawerStep.id, status)}
+            onNotesChange={(val) => setPendingNotes((prev) => new Map(prev).set(drawerStep.id, val))}
+            onSaveNotes={() => saveNotes(drawerStep.id)}
+            onCommentSent={(comment) => setComments((prev) => [...prev, comment])}
+            onDeleteStep={() => {
+              if (drawerStep.isCustom) {
+                const realId = drawerStep.id.replace('custom-', '');
+                deleteCustomStep(realId);
+              }
+            }}
+          />
+        )}
+      </Drawer>
+
+      {/* Add Scenario dialog */}
+      <AddScenarioDialog
+        open={addScenarioOpen}
+        folderId={folderId}
+        existingModules={customModules}
+        onClose={() => setAddScenarioOpen(false)}
+        onCreated={(step) => setCustomSteps((prev) => [...prev, step])}
+      />
     </Box>
   );
 }

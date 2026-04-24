@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const adminClient = await createAdminClient();
   const { data, error } = await adminClient
     .from('testing_comments')
-    .select('id, step_id, author_email, message, created_at')
+    .select('id, step_id, author_email, message, attachment_url, created_at')
     .eq('folder_id', folderId)
     .order('created_at', { ascending: true });
 
@@ -29,8 +29,10 @@ export async function POST(req: NextRequest) {
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
-  const { folderId, stepId, message } = body;
-  if (!folderId || !message?.trim()) return NextResponse.json({ error: 'folderId and message required' }, { status: 400 });
+  const { folderId, stepId, message, attachmentUrl } = body;
+  if (!folderId || (!message?.trim() && !attachmentUrl)) {
+    return NextResponse.json({ error: 'folderId and message or attachment required' }, { status: 400 });
+  }
 
   const adminClient = await createAdminClient();
   const { data, error } = await adminClient
@@ -40,9 +42,10 @@ export async function POST(req: NextRequest) {
       step_id: stepId ?? null,
       author_id: user.id,
       author_email: user.email ?? user.id,
-      message: message.trim(),
+      message: message?.trim() ?? '',
+      attachment_url: attachmentUrl ?? null,
     })
-    .select('id, step_id, author_email, message, created_at')
+    .select('id, step_id, author_email, message, attachment_url, created_at')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
