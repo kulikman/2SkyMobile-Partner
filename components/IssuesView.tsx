@@ -6,12 +6,12 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
-import Collapse from '@mui/material/Collapse';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
+import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
@@ -30,6 +30,7 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ChatBubbleIcon from '@mui/icons-material/ChatBubble';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -132,7 +133,6 @@ function statusMeta(value: string) {
   return STATUSES.find((s) => s.value === value) ?? { label: value, color: '#9e9e9e' };
 }
 
-
 function TypeChip({ type }: { type: string | null }) {
   if (!type) return null;
   const color = TYPE_COLORS[type] ?? '#9e9e9e';
@@ -152,18 +152,259 @@ function TypeChip({ type }: { type: string | null }) {
   );
 }
 
+// ── Issue Drawer ──────────────────────────────────────────────────────────────
+
+function IssueDrawer({
+  ticket,
+  comments,
+  currentUser,
+  isAdmin,
+  sending,
+  onClose,
+  onStatusChange,
+  onEdit,
+  onDelete,
+  onSendComment,
+  onOpenScreenshot,
+}: {
+  ticket: Ticket;
+  comments: TicketComment[];
+  currentUser: CurrentUser;
+  isAdmin: boolean;
+  sending: boolean;
+  onClose: () => void;
+  onStatusChange: (status: string) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onSendComment: (content: string) => void;
+  onOpenScreenshot: (path: string) => void;
+}) {
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const [draft, setDraft] = useState('');
+  const sm = statusMeta(ticket.status);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [comments.length]);
+
+  function handleSend() {
+    if (!draft.trim()) return;
+    onSendComment(draft.trim());
+    setDraft('');
+  }
+
+  return (
+    <Box sx={{ width: 420, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Header */}
+      <Box sx={{ px: 2.5, pt: 2.5, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        <Stack direction="row" alignItems="flex-start" spacing={1}>
+          <Box flex={1}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+              <TypeChip type={ticket.type} />
+              {ticket.module && (
+                <Typography variant="caption" color="text.secondary" noWrap>{ticket.module}</Typography>
+              )}
+            </Stack>
+            <Typography variant="body2" fontWeight={700} sx={{ lineHeight: 1.4, mb: 1 }}>
+              {ticket.title}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              {ticket.created_by_email}
+            </Typography>
+            {/* Status */}
+            <Select
+              value={ticket.status}
+              onChange={(e) => onStatusChange(e.target.value)}
+              size="small"
+              sx={{
+                fontSize: 12, fontWeight: 600, height: 28, color: sm.color,
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: sm.color + '55' },
+                '& .MuiSelect-icon': { color: sm.color },
+              }}
+            >
+              {STATUSES.map((s) => (
+                <MenuItem key={s.value} value={s.value} sx={{ fontSize: 12 }}>{s.label}</MenuItem>
+              ))}
+            </Select>
+          </Box>
+          <Stack direction="row" alignItems="center">
+            {isAdmin && (
+              <IconButton size="small" onClick={onEdit} sx={{ mr: 0.25 }}>
+                <EditIcon sx={{ fontSize: 15 }} />
+              </IconButton>
+            )}
+            {isAdmin && (
+              <IconButton size="small" color="error" onClick={onDelete} sx={{ mr: 0.25 }}>
+                <DeleteIcon sx={{ fontSize: 15 }} />
+              </IconButton>
+            )}
+            <IconButton size="small" onClick={onClose}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+        </Stack>
+      </Box>
+
+      {/* Scrollable body */}
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 2.5, py: 2 }}>
+        <Stack spacing={2}>
+
+          {/* Quick actions */}
+          {isAdmin && ticket.status === 'new' && (
+            <Button size="small" variant="outlined" startIcon={<PlayArrowIcon />}
+              onClick={() => onStatusChange('in_progress')} sx={{ alignSelf: 'flex-start', textTransform: 'none' }}>
+              Take
+            </Button>
+          )}
+          {isAdmin && ticket.status === 'in_progress' && (
+            <Stack direction="row" spacing={1}>
+              <Button size="small" variant="outlined" startIcon={<TaskAltIcon />}
+                onClick={() => onStatusChange('ready_for_testing')} sx={{ textTransform: 'none' }}>
+                Mark done
+              </Button>
+              <Button size="small" variant="outlined" startIcon={<PauseIcon />}
+                onClick={() => onStatusChange('on_hold')} sx={{ textTransform: 'none' }}>
+                On hold
+              </Button>
+            </Stack>
+          )}
+          {!isAdmin && ticket.status === 'ready_for_testing' && (
+            <Button size="small" variant="outlined" color="success" startIcon={<CheckCircleIcon />}
+              onClick={() => onStatusChange('approved')} sx={{ alignSelf: 'flex-start', textTransform: 'none' }}>
+              Approve
+            </Button>
+          )}
+          {isAdmin && ticket.status === 'approved' && (
+            <Button size="small" variant="outlined" startIcon={<TaskAltIcon />}
+              onClick={() => onStatusChange('closed')} sx={{ alignSelf: 'flex-start', textTransform: 'none' }}>
+              Close
+            </Button>
+          )}
+
+          {/* Description */}
+          {ticket.description && (
+            <Box>
+              <Typography variant="caption" fontWeight={700} color="text.secondary"
+                sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', mb: 0.5 }}>
+                Description
+              </Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>
+                {ticket.description}
+              </Typography>
+            </Box>
+          )}
+
+          {/* URL + Screenshot */}
+          {(ticket.url || ticket.screenshot_path) && (
+            <Stack spacing={1}>
+              {ticket.url && (
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <LinkIcon fontSize="small" sx={{ color: 'text.secondary', flexShrink: 0 }} />
+                  <Typography
+                    variant="body2"
+                    component="a"
+                    href={ticket.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{ color: 'primary.main', wordBreak: 'break-all' }}
+                  >
+                    {ticket.url}
+                  </Typography>
+                </Stack>
+              )}
+              {ticket.screenshot_path && (
+                <Button size="small" variant="outlined" startIcon={<AttachFileIcon />}
+                  onClick={() => onOpenScreenshot(ticket.screenshot_path!)}
+                  sx={{ alignSelf: 'flex-start', textTransform: 'none' }}>
+                  View screenshot
+                </Button>
+              )}
+            </Stack>
+          )}
+
+          <Divider />
+
+          {/* Chat */}
+          <Box>
+            <Typography variant="caption" fontWeight={700} color="text.secondary"
+              sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', mb: 1.5 }}>
+              Comments
+            </Typography>
+
+            {comments.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                No comments yet.
+              </Typography>
+            ) : (
+              <Stack spacing={1.5} sx={{ mb: 1 }}>
+                {comments.map((c) => {
+                  const isMe = c.user_id === currentUser.id;
+                  return (
+                    <Stack key={c.id} direction="row" justifyContent={isMe ? 'flex-end' : 'flex-start'}>
+                      <Box sx={{
+                        maxWidth: '85%',
+                        bgcolor: isMe ? '#1565c0' : 'white',
+                        color: isMe ? 'white' : 'text.primary',
+                        border: isMe ? 'none' : '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                        px: 1.5, py: 1,
+                      }}>
+                        {!isMe && (
+                          <Typography variant="caption" fontWeight={700}
+                            sx={{ display: 'block', mb: 0.25, opacity: 0.7 }}>
+                            {c.author_name}
+                          </Typography>
+                        )}
+                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                          {c.content}
+                        </Typography>
+                        <Typography variant="caption"
+                          sx={{ display: 'block', mt: 0.5, opacity: 0.6, fontSize: 10 }}>
+                          {new Date(c.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  );
+                })}
+                <div ref={chatEndRef} />
+              </Stack>
+            )}
+          </Box>
+        </Stack>
+      </Box>
+
+      {/* Input — pinned to bottom */}
+      <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        <Stack direction="row" spacing={1} alignItems="flex-end">
+          <TextField
+            size="small" multiline maxRows={4} fullWidth
+            placeholder="Write a comment…"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          />
+          <IconButton color="primary"
+            disabled={!draft.trim() || sending}
+            onClick={handleSend}
+            sx={{ mb: 0.25, flexShrink: 0 }}>
+            {sending ? <CircularProgress size={18} color="inherit" /> : <SendIcon fontSize="small" />}
+          </IconButton>
+        </Stack>
+      </Box>
+    </Box>
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: string; isAdmin: boolean; currentUser: CurrentUser }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedTicket, setExpandedTicket] = useState<string | null>(null);
+  const [drawerTicketId, setDrawerTicketId] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [ticketComments, setTicketComments] = useState<Map<string, TicketComment[]>>(new Map());
-  const [commentDraft, setCommentDraft] = useState<Map<string, string>>(new Map());
   const [sendingComment, setSendingComment] = useState<Set<string>>(new Set());
-  const chatEndRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
-
 
   // Create / Edit dialog
   const [dialogOpen,  setDialogOpen]  = useState(false);
@@ -195,21 +436,12 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
       .catch(() => {});
   }, [folderId]);
 
-  // scroll chat to bottom when ticket expands or new comment
-  useEffect(() => {
-    if (expandedTicket) {
-      chatEndRefs.current.get(expandedTicket)?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [expandedTicket, ticketComments]);
-
-  const sendComment = useCallback(async (ticketId: string) => {
-    const message = (commentDraft.get(ticketId) ?? '').trim();
-    if (!message) return;
+  const sendComment = useCallback(async (ticketId: string, content: string) => {
     setSendingComment((prev) => new Set(prev).add(ticketId));
     const res = await fetch('/api/ticket-comments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ticket_id: ticketId, content: message }),
+      body: JSON.stringify({ ticket_id: ticketId, content }),
     });
     if (res.ok) {
       const data: TicketComment = await res.json();
@@ -218,10 +450,9 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
         next.set(ticketId, [...(prev.get(ticketId) ?? []), data]);
         return next;
       });
-      setCommentDraft((prev) => { const next = new Map(prev); next.set(ticketId, ''); return next; });
     }
     setSendingComment((prev) => { const next = new Set(prev); next.delete(ticketId); return next; });
-  }, [commentDraft]);
+  }, []);
 
   // ── Form helpers ──────────────────────────────────────────────────────────
 
@@ -339,7 +570,7 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
     setDialogOpen(false);
   }
 
-  // ── Status actions ────────────────────────────────────────────────────────
+  // ── Status + delete ───────────────────────────────────────────────────────
 
   async function updateStatus(id: string, status: string) {
     const res = await fetch(`/api/tickets/${id}`, {
@@ -355,7 +586,10 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
 
   async function deleteTicket(id: string) {
     const res = await fetch(`/api/tickets/${id}`, { method: 'DELETE' });
-    if (res.ok) setTickets((prev) => prev.filter((t) => t.id !== id));
+    if (res.ok) {
+      setTickets((prev) => prev.filter((t) => t.id !== id));
+      if (drawerTicketId === id) setDrawerTicketId(null);
+    }
   }
 
   async function openScreenshot(path: string) {
@@ -364,16 +598,96 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
     if (data?.signedUrl) window.open(data.signedUrl, '_blank');
   }
 
-  // ── Filtered list ─────────────────────────────────────────────────────────
+  // ── Data ──────────────────────────────────────────────────────────────────
 
-  const filtered = tickets;
-
-  // Group by priority
   const groups = PRIORITIES.map((p) => ({
     priority: p,
-    items: filtered.filter((t) => t.priority === p.value),
+    items: tickets.filter((t) => t.priority === p.value),
   })).filter((g) => g.items.length > 0);
-  const ungrouped = filtered.filter((t) => !PRIORITIES.find((p) => p.value === t.priority));
+
+  const ungrouped = tickets.filter((t) => !PRIORITIES.find((p) => p.value === t.priority));
+
+  const drawerTicket = drawerTicketId ? tickets.find((t) => t.id === drawerTicketId) ?? null : null;
+
+  // ── Row renderer ──────────────────────────────────────────────────────────
+
+  function renderTicketRow(ticket: Ticket) {
+    const sm = statusMeta(ticket.status);
+    const threadComments = ticketComments.get(ticket.id) ?? [];
+    const hasComments = threadComments.length > 0;
+
+    return (
+      <TableRow
+        key={ticket.id}
+        hover
+        onClick={() => setDrawerTicketId(ticket.id)}
+        sx={{ cursor: 'pointer' }}
+      >
+        {/* Title */}
+        <TableCell sx={{ py: 1 }}>
+          <Typography variant="body2" fontWeight={600} noWrap>{ticket.title}</Typography>
+          <Typography variant="caption" color="text.secondary" noWrap>{ticket.created_by_email}</Typography>
+        </TableCell>
+
+        {/* Type */}
+        <TableCell sx={{ py: 1 }}>
+          <TypeChip type={ticket.type} />
+        </TableCell>
+
+        {/* Module */}
+        <TableCell sx={{ py: 1 }}>
+          {ticket.module && (
+            <Typography variant="caption" fontWeight={500} color="text.secondary" noWrap>
+              {ticket.module}
+            </Typography>
+          )}
+        </TableCell>
+
+        {/* Status */}
+        <TableCell sx={{ py: 1 }} onClick={(e) => e.stopPropagation()}>
+          <Select
+            value={ticket.status}
+            onChange={(e) => updateStatus(ticket.id, e.target.value)}
+            size="small"
+            sx={{
+              fontSize: 12, fontWeight: 600, height: 28, color: sm.color,
+              '& .MuiOutlinedInput-notchedOutline': { borderColor: sm.color + '55' },
+              '& .MuiSelect-icon': { color: sm.color },
+            }}
+          >
+            {STATUSES.map((s) => (
+              <MenuItem key={s.value} value={s.value} sx={{ fontSize: 12 }}>{s.label}</MenuItem>
+            ))}
+          </Select>
+        </TableCell>
+
+        {/* Actions */}
+        <TableCell align="right" sx={{ py: 0.5 }} onClick={(e) => e.stopPropagation()}>
+          <Stack direction="row" spacing={0.25} justifyContent="flex-end" alignItems="center">
+            {isAdmin && (
+              <IconButton size="small" onClick={() => openEdit(ticket)}>
+                <EditIcon sx={{ fontSize: 15 }} />
+              </IconButton>
+            )}
+            {isAdmin && (
+              <IconButton size="small" color="error" onClick={() => deleteTicket(ticket.id)}>
+                <DeleteIcon sx={{ fontSize: 15 }} />
+              </IconButton>
+            )}
+            <IconButton
+              size="small"
+              onClick={() => setDrawerTicketId(ticket.id)}
+              sx={{ color: hasComments ? 'primary.main' : 'text.disabled', p: 0.25 }}
+            >
+              {hasComments
+                ? <ChatBubbleIcon sx={{ fontSize: 15 }} />
+                : <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />}
+            </IconButton>
+          </Stack>
+        </TableCell>
+      </TableRow>
+    );
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -390,12 +704,9 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
         </Button>
       </Stack>
 
-
       {/* Table */}
-      {filtered.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          No issues reported yet.
-        </Typography>
+      {tickets.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">No issues reported yet.</Typography>
       ) : (
         <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
           <TableContainer>
@@ -414,35 +725,22 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
                 {groups.map(({ priority, items }) => {
                   const isCollapsed = collapsedGroups.has(priority.value);
                   return [
-                    /* Group header row */
                     <TableRow key={`grp-${priority.value}`}>
-                      <TableCell
-                        colSpan={5}
-                        sx={{ p: 0, bgcolor: priority.color }}
-                      >
-                        <Stack
-                          direction="row"
-                          alignItems="center"
-                          spacing={1}
+                      <TableCell colSpan={5} sx={{ p: 0, bgcolor: priority.color }}>
+                        <Stack direction="row" alignItems="center" spacing={1}
                           sx={{ px: 1.5, py: 0.75, cursor: 'pointer' }}
-                          onClick={() => toggleGroup(priority.value)}
-                        >
-                          <KeyboardArrowDownIcon
-                            sx={{
-                              color: 'white', fontSize: 18,
-                              transform: isCollapsed ? 'rotate(-90deg)' : 'none',
-                              transition: 'transform 0.2s',
-                              flexShrink: 0,
-                            }}
-                          />
+                          onClick={() => toggleGroup(priority.value)}>
+                          <KeyboardArrowDownIcon sx={{
+                            color: 'white', fontSize: 18, flexShrink: 0,
+                            transform: isCollapsed ? 'rotate(-90deg)' : 'none',
+                            transition: 'transform 0.2s',
+                          }} />
                           <Typography sx={{ color: 'white', fontWeight: 700, fontSize: 13, flex: 1 }}>
                             {priority.label} Priority
                           </Typography>
                           <Box sx={{
-                            bgcolor: 'white', borderRadius: '50%',
-                            width: 22, height: 22,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            flexShrink: 0,
+                            bgcolor: 'white', borderRadius: '50%', width: 22, height: 22,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                           }}>
                             <Typography sx={{ color: priority.color, fontWeight: 800, fontSize: 11, lineHeight: 1 }}>
                               {items.length}
@@ -452,371 +750,40 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
                       </TableCell>
                     </TableRow>,
 
-                    /* Issue rows */
-                    ...(!isCollapsed ? items.flatMap((ticket) => {
-                      const sm = statusMeta(ticket.status);
-                      const isOpen = expandedTicket === ticket.id;
-                      const threadComments = ticketComments.get(ticket.id) ?? [];
-                      const hasComments = threadComments.length > 0;
-
-                      return [
-                        <TableRow
-                          key={ticket.id}
-                          hover
-                          sx={{ '& td': { borderBottom: isOpen ? 'none' : undefined } }}
-                        >
-                          {/* Title */}
-                          <TableCell sx={{ py: 1 }}>
-                            <Typography variant="body2" fontWeight={600} noWrap>
-                              {ticket.title}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" noWrap>
-                              {ticket.created_by_email}
-                            </Typography>
-                          </TableCell>
-
-                          {/* Type */}
-                          <TableCell sx={{ py: 1 }}>
-                            <TypeChip type={ticket.type} />
-                          </TableCell>
-
-                          {/* Module */}
-                          <TableCell sx={{ py: 1 }}>
-                            {ticket.module && (
-                              <Typography variant="caption" fontWeight={500} color="text.secondary" noWrap>
-                                {ticket.module}
-                              </Typography>
-                            )}
-                          </TableCell>
-
-                          {/* Status — inline select */}
-                          <TableCell sx={{ py: 1 }} onClick={(e) => e.stopPropagation()}>
-                            <Select
-                              value={ticket.status}
-                              onChange={(e) => updateStatus(ticket.id, e.target.value)}
-                              size="small"
-                              sx={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                height: 28,
-                                color: sm.color,
-                                '& .MuiOutlinedInput-notchedOutline': {
-                                  borderColor: sm.color + '55',
-                                },
-                                '& .MuiSelect-icon': { color: sm.color },
-                              }}
-                            >
-                              {STATUSES.map((s) => (
-                                <MenuItem key={s.value} value={s.value} sx={{ fontSize: 12 }}>
-                                  {s.label}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </TableCell>
-
-                          {/* Actions */}
-                          <TableCell align="right" sx={{ py: 0.5 }} onClick={(e) => e.stopPropagation()}>
-                            <Stack direction="row" spacing={0.25} justifyContent="flex-end" alignItems="center">
-                              {isAdmin && ticket.status === 'new' && (
-                                <IconButton size="small" title="Take" onClick={() => updateStatus(ticket.id, 'in_progress')}>
-                                  <PlayArrowIcon sx={{ fontSize: 16, color: '#f57c00' }} />
-                                </IconButton>
-                              )}
-                              {isAdmin && ticket.status === 'in_progress' && (
-                                <IconButton size="small" title="Mark done" onClick={() => updateStatus(ticket.id, 'ready_for_testing')}>
-                                  <TaskAltIcon sx={{ fontSize: 16, color: '#1976d2' }} />
-                                </IconButton>
-                              )}
-                              {isAdmin && ticket.status === 'in_progress' && (
-                                <IconButton size="small" title="On hold" onClick={() => updateStatus(ticket.id, 'on_hold')}>
-                                  <PauseIcon sx={{ fontSize: 16, color: '#7b1fa2' }} />
-                                </IconButton>
-                              )}
-                              {!isAdmin && ticket.status === 'ready_for_testing' && ticket.created_by && (
-                                <IconButton size="small" title="Approve" onClick={() => updateStatus(ticket.id, 'approved')}>
-                                  <CheckCircleIcon sx={{ fontSize: 16, color: '#388e3c' }} />
-                                </IconButton>
-                              )}
-                              {isAdmin && ticket.status === 'approved' && (
-                                <IconButton size="small" title="Close" onClick={() => updateStatus(ticket.id, 'closed')}>
-                                  <TaskAltIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
-                              )}
-                              {isAdmin && (
-                                <IconButton size="small" onClick={() => openEdit(ticket)}>
-                                  <EditIcon sx={{ fontSize: 15 }} />
-                                </IconButton>
-                              )}
-                              {isAdmin && (
-                                <IconButton size="small" color="error" onClick={() => deleteTicket(ticket.id)}>
-                                  <DeleteIcon sx={{ fontSize: 15 }} />
-                                </IconButton>
-                              )}
-                              <IconButton
-                                size="small"
-                                onClick={() => setExpandedTicket(isOpen ? null : ticket.id)}
-                                sx={{ color: hasComments ? 'primary.main' : 'text.disabled', p: 0.25 }}
-                              >
-                                {hasComments
-                                  ? <ChatBubbleIcon sx={{ fontSize: 15 }} />
-                                  : <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />}
-                              </IconButton>
-                            </Stack>
-                          </TableCell>
-                        </TableRow>,
-
-                        /* Expanded detail row */
-                        isOpen ? (
-                          <TableRow key={`${ticket.id}-detail`}>
-                            <TableCell colSpan={5} sx={{ pb: 2, pt: 0, bgcolor: '#f8fafc' }}>
-                              <Box sx={{ px: 2 }}>
-                                <Collapse in={isOpen}>
-                                  <Stack spacing={1.5} pt={1.5}>
-                                    {ticket.description && (
-                                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>
-                                        {ticket.description}
-                                      </Typography>
-                                    )}
-                                    <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
-                                      {ticket.url && (
-                                        <Stack direction="row" spacing={0.5} alignItems="center">
-                                          <LinkIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                                          <Typography variant="body2" component="a" href={ticket.url}
-                                            target="_blank" rel="noopener noreferrer"
-                                            sx={{ color: 'primary.main', wordBreak: 'break-all' }}>
-                                            {ticket.url}
-                                          </Typography>
-                                        </Stack>
-                                      )}
-                                      {ticket.screenshot_path && (
-                                        <Button size="small" variant="outlined" startIcon={<AttachFileIcon />}
-                                          onClick={() => openScreenshot(ticket.screenshot_path!)}
-                                          sx={{ alignSelf: 'flex-start' }}>
-                                          View screenshot
-                                        </Button>
-                                      )}
-                                    </Stack>
-
-                                    <Divider />
-
-                                    {/* Chat thread */}
-                                    <Box>
-                                      <Typography variant="caption" fontWeight={700} color="text.secondary"
-                                        sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', mb: 1 }}>
-                                        Comments
-                                      </Typography>
-                                      {threadComments.length === 0 ? (
-                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                                          No comments yet. Be the first!
-                                        </Typography>
-                                      ) : (
-                                        <Stack spacing={1.5} sx={{ mb: 1.5, maxHeight: 280, overflowY: 'auto', pr: 0.5 }}>
-                                          {threadComments.map((c) => {
-                                            const isMe = c.user_id === currentUser.id;
-                                            return (
-                                              <Stack key={c.id} direction="row" justifyContent={isMe ? 'flex-end' : 'flex-start'}>
-                                                <Box sx={{
-                                                  maxWidth: '75%',
-                                                  bgcolor: isMe ? '#1565c0' : 'white',
-                                                  color: isMe ? 'white' : 'text.primary',
-                                                  border: isMe ? 'none' : '1px solid',
-                                                  borderColor: 'divider',
-                                                  borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                                                  px: 1.5, py: 1,
-                                                }}>
-                                                  {!isMe && (
-                                                    <Typography variant="caption" fontWeight={700}
-                                                      sx={{ display: 'block', mb: 0.25, opacity: 0.7 }}>
-                                                      {c.author_name}
-                                                    </Typography>
-                                                  )}
-                                                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                                                    {c.content}
-                                                  </Typography>
-                                                  <Typography variant="caption"
-                                                    sx={{ display: 'block', mt: 0.5, opacity: 0.6, fontSize: 10 }}>
-                                                    {new Date(c.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                  </Typography>
-                                                </Box>
-                                              </Stack>
-                                            );
-                                          })}
-                                          <div ref={(el) => { chatEndRefs.current.set(ticket.id, el); }} />
-                                        </Stack>
-                                      )}
-                                      <Stack direction="row" spacing={1} alignItems="flex-end">
-                                        <TextField
-                                          size="small" fullWidth multiline maxRows={3}
-                                          placeholder="Write a comment…"
-                                          value={commentDraft.get(ticket.id) ?? ''}
-                                          onChange={(e) => setCommentDraft((prev) => new Map(prev).set(ticket.id, e.target.value))}
-                                          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendComment(ticket.id); } }}
-                                        />
-                                        <IconButton color="primary"
-                                          disabled={sendingComment.has(ticket.id) || !(commentDraft.get(ticket.id) ?? '').trim()}
-                                          onClick={() => sendComment(ticket.id)}
-                                          sx={{ flexShrink: 0 }}>
-                                          {sendingComment.has(ticket.id)
-                                            ? <CircularProgress size={18} />
-                                            : <SendIcon />}
-                                        </IconButton>
-                                      </Stack>
-                                    </Box>
-                                  </Stack>
-                                </Collapse>
-                              </Box>
-                            </TableCell>
-                          </TableRow>
-                        ) : null,
-                      ];
-                    }) : []),
+                    ...(!isCollapsed ? items.map(renderTicketRow) : []),
                   ];
                 })}
 
-                {/* Ungrouped rows (no known priority) */}
-                {ungrouped.length > 0 && ungrouped.flatMap((ticket) => {
-                  const sm = statusMeta(ticket.status);
-                  const isOpen = expandedTicket === ticket.id;
-                  const threadComments = ticketComments.get(ticket.id) ?? [];
-                  const hasComments = threadComments.length > 0;
-                  return [
-                    <TableRow key={ticket.id} hover sx={{ '& td': { borderBottom: isOpen ? 'none' : undefined } }}>
-                      <TableCell sx={{ py: 1 }}>
-                        <Typography variant="body2" fontWeight={600} noWrap>{ticket.title}</Typography>
-                        <Typography variant="caption" color="text.secondary" noWrap>{ticket.created_by_email}</Typography>
-                      </TableCell>
-                      <TableCell sx={{ py: 1 }}><TypeChip type={ticket.type} /></TableCell>
-                      <TableCell sx={{ py: 1 }}>
-                        {ticket.module && <Typography variant="caption" fontWeight={500} color="text.secondary" noWrap>{ticket.module}</Typography>}
-                      </TableCell>
-                      <TableCell sx={{ py: 1 }} onClick={(e) => e.stopPropagation()}>
-                        <Select value={ticket.status} onChange={(e) => updateStatus(ticket.id, e.target.value)}
-                          size="small"
-                          sx={{ fontSize: 12, fontWeight: 600, height: 28, color: sm.color,
-                            '& .MuiOutlinedInput-notchedOutline': { borderColor: sm.color + '55' },
-                            '& .MuiSelect-icon': { color: sm.color } }}>
-                          {STATUSES.map((s) => <MenuItem key={s.value} value={s.value} sx={{ fontSize: 12 }}>{s.label}</MenuItem>)}
-                        </Select>
-                      </TableCell>
-                      <TableCell align="right" sx={{ py: 0.5 }} onClick={(e) => e.stopPropagation()}>
-                        <Stack direction="row" spacing={0.25} justifyContent="flex-end" alignItems="center">
-                          {isAdmin && <IconButton size="small" onClick={() => openEdit(ticket)}><EditIcon sx={{ fontSize: 15 }} /></IconButton>}
-                          {isAdmin && <IconButton size="small" color="error" onClick={() => deleteTicket(ticket.id)}><DeleteIcon sx={{ fontSize: 15 }} /></IconButton>}
-                          <IconButton size="small"
-                            onClick={() => setExpandedTicket(isOpen ? null : ticket.id)}
-                            sx={{ color: hasComments ? 'primary.main' : 'text.disabled', p: 0.25 }}>
-                            {hasComments
-                              ? <ChatBubbleIcon sx={{ fontSize: 15 }} />
-                              : <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />}
-                          </IconButton>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>,
-                    isOpen ? (
-                      <TableRow key={`${ticket.id}-detail`}>
-                        <TableCell colSpan={5} sx={{ pb: 2, pt: 0, bgcolor: '#f8fafc' }}>
-                          <Box sx={{ px: 2 }}>
-                            <Collapse in={isOpen}>
-                              <Stack spacing={1.5} pt={1.5}>
-                                {ticket.description && (
-                                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>
-                                    {ticket.description}
-                                  </Typography>
-                                )}
-                                {(ticket.url || ticket.screenshot_path) && (
-                                  <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
-                                    {ticket.url && (
-                                      <Stack direction="row" spacing={0.5} alignItems="center">
-                                        <LinkIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                                        <Typography variant="body2" component="a" href={ticket.url}
-                                          target="_blank" rel="noopener noreferrer"
-                                          sx={{ color: 'primary.main', wordBreak: 'break-all' }}>
-                                          {ticket.url}
-                                        </Typography>
-                                      </Stack>
-                                    )}
-                                    {ticket.screenshot_path && (
-                                      <Button size="small" variant="outlined" startIcon={<AttachFileIcon />}
-                                        onClick={() => openScreenshot(ticket.screenshot_path!)}
-                                        sx={{ alignSelf: 'flex-start' }}>
-                                        View screenshot
-                                      </Button>
-                                    )}
-                                  </Stack>
-                                )}
-                                <Divider />
-                                <Box>
-                                  <Typography variant="caption" fontWeight={700} color="text.secondary"
-                                    sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', mb: 1 }}>
-                                    Comments
-                                  </Typography>
-                                  {threadComments.length === 0 ? (
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                                      No comments yet. Be the first!
-                                    </Typography>
-                                  ) : (
-                                    <Stack spacing={1.5} sx={{ mb: 1.5, maxHeight: 280, overflowY: 'auto', pr: 0.5 }}>
-                                      {threadComments.map((c) => {
-                                        const isMe = c.user_id === currentUser.id;
-                                        return (
-                                          <Stack key={c.id} direction="row" justifyContent={isMe ? 'flex-end' : 'flex-start'}>
-                                            <Box sx={{
-                                              maxWidth: '75%',
-                                              bgcolor: isMe ? '#1565c0' : 'white',
-                                              color: isMe ? 'white' : 'text.primary',
-                                              border: isMe ? 'none' : '1px solid',
-                                              borderColor: 'divider',
-                                              borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                                              px: 1.5, py: 1,
-                                            }}>
-                                              {!isMe && (
-                                                <Typography variant="caption" fontWeight={700}
-                                                  sx={{ display: 'block', mb: 0.25, opacity: 0.7 }}>
-                                                  {c.author_name}
-                                                </Typography>
-                                              )}
-                                              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                                                {c.content}
-                                              </Typography>
-                                              <Typography variant="caption"
-                                                sx={{ display: 'block', mt: 0.5, opacity: 0.6, fontSize: 10 }}>
-                                                {new Date(c.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                              </Typography>
-                                            </Box>
-                                          </Stack>
-                                        );
-                                      })}
-                                      <div ref={(el) => { chatEndRefs.current.set(ticket.id, el); }} />
-                                    </Stack>
-                                  )}
-                                  <Stack direction="row" spacing={1} alignItems="flex-end">
-                                    <TextField size="small" fullWidth multiline maxRows={3}
-                                      placeholder="Write a comment…"
-                                      value={commentDraft.get(ticket.id) ?? ''}
-                                      onChange={(e) => setCommentDraft((prev) => new Map(prev).set(ticket.id, e.target.value))}
-                                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendComment(ticket.id); } }}
-                                    />
-                                    <IconButton color="primary"
-                                      disabled={sendingComment.has(ticket.id) || !(commentDraft.get(ticket.id) ?? '').trim()}
-                                      onClick={() => sendComment(ticket.id)}
-                                      sx={{ flexShrink: 0 }}>
-                                      {sendingComment.has(ticket.id) ? <CircularProgress size={18} /> : <SendIcon />}
-                                    </IconButton>
-                                  </Stack>
-                                </Box>
-                              </Stack>
-                            </Collapse>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ) : null,
-                  ];
-                })}
+                {ungrouped.map(renderTicketRow)}
               </TableBody>
             </Table>
           </TableContainer>
         </Paper>
       )}
+
+      {/* Right-side drawer */}
+      <Drawer
+        anchor="right"
+        open={!!drawerTicketId && !!drawerTicket}
+        onClose={() => setDrawerTicketId(null)}
+        PaperProps={{ sx: { width: 420, boxShadow: 6 } }}
+      >
+        {drawerTicket && (
+          <IssueDrawer
+            ticket={drawerTicket}
+            comments={ticketComments.get(drawerTicket.id) ?? []}
+            currentUser={currentUser}
+            isAdmin={isAdmin}
+            sending={sendingComment.has(drawerTicket.id)}
+            onClose={() => setDrawerTicketId(null)}
+            onStatusChange={(status) => updateStatus(drawerTicket.id, status)}
+            onEdit={() => { openEdit(drawerTicket); setDrawerTicketId(null); }}
+            onDelete={() => deleteTicket(drawerTicket.id)}
+            onSendComment={(content) => sendComment(drawerTicket.id, content)}
+            onOpenScreenshot={openScreenshot}
+          />
+        )}
+      </Drawer>
 
       {/* Create / Edit dialog */}
       <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
@@ -836,7 +803,6 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
               value={form.description} onChange={(e) => setField('description', e.target.value)}
               fullWidth multiline rows={3} />
 
-            {/* Module + Type */}
             <Stack direction="row" spacing={2}>
               <TextField label="Module" select value={form.module}
                 onChange={(e) => setField('module', e.target.value)} fullWidth>
@@ -850,7 +816,6 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
               </TextField>
             </Stack>
 
-            {/* Priority + Severity */}
             <Stack direction="row" spacing={2}>
               <TextField label="Priority" select value={form.priority}
                 onChange={(e) => setField('priority', e.target.value)} fullWidth>
@@ -870,7 +835,6 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
               value={form.comments} onChange={(e) => setField('comments', e.target.value)}
               fullWidth multiline rows={2} />
 
-            {/* Screenshot */}
             <Box>
               <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
                 onChange={(e) => setScreenshotFile(e.target.files?.[0] ?? null)} />
