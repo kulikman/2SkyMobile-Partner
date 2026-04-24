@@ -12,7 +12,6 @@ import { ProjectTabs } from '@/components/ProjectTabs';
 import { getDisplayName } from '@/lib/user-display';
 import type { ProjectData } from '@/components/ProjectDetail';
 import type { ReportDoc } from '@/components/ReportList';
-import type { Task } from '@/components/TasksView';
 
 export default async function ProjectPage({
   params,
@@ -75,26 +74,6 @@ export default async function ProjectPage({
     ? (rawCompanies ?? []).find((c) => c.id === folder.company_id) ?? null
     : null;
 
-  const { data: rawTasks } = await adminClient
-    .from('documents')
-    .select('id, folder_id, title, description, position, created_at, metadata')
-    .eq('folder_id', id)
-    .eq('doc_type', 'task')
-    .order('position', { ascending: true });
-
-  const tasks: Task[] = (rawTasks ?? []).map((t) => {
-    const m = (t.metadata as Record<string, unknown>) ?? {};
-    return {
-      id: t.id, folder_id: t.folder_id,
-      group_label: (m.group_label as string) ?? null, title: t.title,
-      description: t.description ?? null, type: (m.type as string) ?? null,
-      role: (m.role as string) ?? null, status: (m.status as string) ?? 'backlog',
-      estimated_hours: (m.estimated_hours as number) ?? null,
-      start_date: (m.start_date as string) ?? null, due_date: (m.due_date as string) ?? null,
-      completed_at: (m.completed_at as string) ?? null, created_at: t.created_at,
-    };
-  });
-
   const { data: rawDocs } = await supabase
     .from('documents')
     .select('id, slug, title, description, report_type, report_period_start, report_period_end, created_at')
@@ -151,8 +130,6 @@ export default async function ProjectPage({
         {/* Tabbed sections */}
         <ProjectTabs
           folderId={id}
-          projectStartAt={folder.started_at ?? null}
-          initialTasks={tasks}
           reports={reports}
           initialSpec={f.tech_spec as Record<string, string> | null ?? null}
           isAdmin={isAdmin}

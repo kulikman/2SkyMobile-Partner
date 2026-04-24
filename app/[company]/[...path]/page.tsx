@@ -31,7 +31,6 @@ import { ProjectDetail } from '@/components/ProjectDetail';
 import { ProjectTabs } from '@/components/ProjectTabs';
 import type { ProjectData } from '@/components/ProjectDetail';
 import type { ReportDoc } from '@/components/ReportList';
-import type { Task } from '@/components/TasksView';
 
 const RESERVED = new Set([
   'login', 'admin', 'projects', 'docs', 'share', 'blueprint',
@@ -130,15 +129,10 @@ export default async function SpacePathPage({
     const [
       { data: folderData },
       { data: rawCompanies },
-      { data: rawTasks },
       { data: rawDocs },
     ] = await Promise.all([
       adminClient.from('folders').select('*').eq('id', resolved.folderId).single(),
       adminClient.from('companies').select('id, name, slug').order('name', { ascending: true }),
-      adminClient.from('documents')
-        .select('id, folder_id, title, description, position, created_at, metadata')
-        .eq('folder_id', resolved.folderId).eq('doc_type', 'task')
-        .order('position', { ascending: true }),
       adminClient.from('documents')
         .select('id, slug, title, description, report_type, report_period_start, report_period_end, created_at')
         .eq('folder_id', resolved.folderId).eq('doc_type', 'md')
@@ -163,19 +157,6 @@ export default async function SpacePathPage({
     };
 
     const companies = (rawCompanies ?? []).map((c) => ({ id: c.id as string, name: c.name as string }));
-
-    const tasks: Task[] = (rawTasks ?? []).map((t) => {
-      const m = (t.metadata as Record<string, unknown>) ?? {};
-      return {
-        id: t.id, folder_id: t.folder_id,
-        group_label: (m.group_label as string) ?? null, title: t.title,
-        description: t.description ?? null, type: (m.type as string) ?? null,
-        role: (m.role as string) ?? null, status: (m.status as string) ?? 'backlog',
-        estimated_hours: (m.estimated_hours as number) ?? null,
-        start_date: (m.start_date as string) ?? null, due_date: (m.due_date as string) ?? null,
-        completed_at: (m.completed_at as string) ?? null, created_at: t.created_at,
-      };
-    });
 
     const reports: ReportDoc[] = (rawDocs ?? []).map((d: Record<string, unknown>) => ({
       id: d.id as string,
@@ -212,8 +193,6 @@ export default async function SpacePathPage({
 
           <ProjectTabs
             folderId={resolved.folderId}
-            projectStartAt={f.started_at ?? null}
-            initialTasks={tasks}
             reports={reports}
             initialSpec={f.tech_spec as Record<string, string> | null ?? null}
             isAdmin={isAdmin}
