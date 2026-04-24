@@ -19,14 +19,6 @@ import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Select from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
-import Tab from '@mui/material/Tab';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -95,29 +87,8 @@ const TYPE_COLORS: Record<string, string> = {
   Testing:        '#c62828',
 };
 
-function StatusChip({ status, onChange }: { status: string; onChange?: (s: string) => void; isAdmin: boolean }) {
-  const s = STATUSES.find((x) => x.value === status) ?? STATUSES[0];
-  if (!onChange) {
-    return (
-      <Chip label={s.label} size="small"
-        sx={{ bgcolor: s.color + '22', color: s.color, fontWeight: 600, fontSize: 11, border: `1px solid ${s.color}44` }} />
-    );
-  }
-  return (
-    <Select
-      value={status}
-      size="small"
-      onChange={(e) => onChange(e.target.value)}
-      sx={{ fontSize: 12, height: 28, '.MuiOutlinedInput-notchedOutline': { borderColor: s.color + '66' }, color: s.color, fontWeight: 600 }}
-    >
-      {STATUSES.map((x) => (
-        <MenuItem key={x.value} value={x.value} sx={{ fontSize: 12 }}>{x.label}</MenuItem>
-      ))}
-    </Select>
-  );
-}
 
-function TaskRow({ task, isAdmin, hasComments, onStatusChange, onOpenComments, onEdit, onDelete }:
+function TaskCard({ task, isAdmin, hasComments, onStatusChange, onOpenComments, onEdit, onDelete }:
   { task: Task; isAdmin: boolean; hasComments: boolean;
     onStatusChange: (id: string, status: string) => void;
     onOpenComments: (task: Task) => void;
@@ -125,6 +96,7 @@ function TaskRow({ task, isAdmin, hasComments, onStatusChange, onOpenComments, o
     onDelete: (id: string) => void }) {
 
   const [updating, setUpdating] = useState(false);
+  const s = STATUSES.find((x) => x.value === task.status) ?? STATUSES[0];
 
   async function handleStatus(newStatus: string) {
     setUpdating(true);
@@ -138,69 +110,75 @@ function TaskRow({ task, isAdmin, hasComments, onStatusChange, onOpenComments, o
   }
 
   return (
-    <TableRow hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
-      <TableCell sx={{ pl: 4, maxWidth: 320 }}>
-        <Typography variant="body2" fontWeight={500}>{task.title}</Typography>
-        {task.description && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-            {task.description.slice(0, 80)}{task.description.length > 80 ? '…' : ''}
-          </Typography>
-        )}
-      </TableCell>
-      <TableCell>
-        {task.type && (
-          <Chip label={task.type} size="small" variant="outlined"
-            sx={{ fontSize: 11, borderColor: TYPE_COLORS[task.type] ?? '#9e9e9e',
-              color: TYPE_COLORS[task.type] ?? '#9e9e9e' }} />
-        )}
-      </TableCell>
-      <TableCell>
-        {task.role && (
-          <Typography variant="caption" fontWeight={700}
-            sx={{ color: ROLE_COLORS[task.role] ?? 'text.primary' }}>
-            {task.role}
-          </Typography>
-        )}
-      </TableCell>
-      <TableCell align="right">
-        <Typography variant="body2">{task.estimated_hours != null ? `${task.estimated_hours} h` : '—'}</Typography>
-      </TableCell>
-      <TableCell>
-        {updating ? <CircularProgress size={18} /> : (
-          <StatusChip
-            status={task.status}
-            isAdmin={isAdmin}
-            onChange={isAdmin ? handleStatus : undefined}
-          />
-        )}
-      </TableCell>
-      <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
-        <Stack direction="row" spacing={0} alignItems="center" justifyContent="center">
-          {isAdmin && (
-            <Tooltip title="Edit">
-              <IconButton size="small" onClick={() => onEdit(task)} sx={{ color: 'text.disabled' }}>
-                <EditIcon sx={{ fontSize: 15 }} />
+    <Paper variant="outlined" sx={{ px: 2, py: 1.5, borderRadius: 2, '&:hover': { borderColor: 'primary.main' }, transition: 'border-color 0.15s' }}>
+      <Stack direction="row" spacing={1.5} alignItems="flex-start">
+        {/* Left: title + meta */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="body2" fontWeight={600} sx={{ mb: 0.25 }}>{task.title}</Typography>
+          {task.description && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+              {task.description.slice(0, 100)}{task.description.length > 100 ? '…' : ''}
+            </Typography>
+          )}
+          <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap alignItems="center">
+            {task.type && (
+              <Chip label={task.type} size="small" variant="outlined"
+                sx={{ fontSize: 11, height: 20, borderColor: TYPE_COLORS[task.type] ?? '#9e9e9e', color: TYPE_COLORS[task.type] ?? '#9e9e9e' }} />
+            )}
+            {task.role && (
+              <Chip label={task.role} size="small"
+                sx={{ fontSize: 11, height: 20, bgcolor: (ROLE_COLORS[task.role] ?? '#9e9e9e') + '18', color: ROLE_COLORS[task.role] ?? 'text.secondary', fontWeight: 700, border: 'none' }} />
+            )}
+            {task.estimated_hours != null && (
+              <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 600 }}>
+                {task.estimated_hours} h
+              </Typography>
+            )}
+            {task.due_date && (
+              <Typography variant="caption" color="text.disabled">
+                Due {new Date(task.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+              </Typography>
+            )}
+          </Stack>
+        </Box>
+
+        {/* Right: status + actions */}
+        <Stack alignItems="flex-end" spacing={0.5} sx={{ flexShrink: 0 }}>
+          {updating ? <CircularProgress size={18} /> : isAdmin ? (
+            <Select value={task.status} size="small" onChange={(e) => handleStatus(e.target.value)}
+              sx={{ fontSize: 11, fontWeight: 700, height: 24, color: s.color,
+                '.MuiOutlinedInput-notchedOutline': { borderColor: s.color + '55' },
+                '.MuiSelect-icon': { color: s.color, fontSize: 16 } }}>
+              {STATUSES.map((x) => <MenuItem key={x.value} value={x.value} sx={{ fontSize: 12 }}>{x.label}</MenuItem>)}
+            </Select>
+          ) : (
+            <Chip label={s.label} size="small"
+              sx={{ fontSize: 11, height: 22, bgcolor: s.color + '22', color: s.color, fontWeight: 600, border: `1px solid ${s.color}44` }} />
+          )}
+          <Stack direction="row" spacing={0} alignItems="center">
+            {isAdmin && (
+              <Tooltip title="Edit">
+                <IconButton size="small" onClick={() => onEdit(task)} sx={{ color: 'text.disabled', p: 0.5 }}>
+                  <EditIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+            {isAdmin && (
+              <Tooltip title="Delete">
+                <IconButton size="small" color="error" onClick={() => onDelete(task.id)} sx={{ p: 0.5 }}>
+                  <DeleteIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Tooltip title="Comments">
+              <IconButton size="small" onClick={() => onOpenComments(task)} sx={{ p: 0.5, color: hasComments ? 'primary.main' : 'text.disabled' }}>
+                {hasComments ? <ChatBubbleIcon sx={{ fontSize: 14 }} /> : <ChatBubbleOutlineIcon sx={{ fontSize: 14 }} />}
               </IconButton>
             </Tooltip>
-          )}
-          {isAdmin && (
-            <Tooltip title="Delete">
-              <IconButton size="small" color="error" onClick={() => onDelete(task.id)}>
-                <DeleteIcon sx={{ fontSize: 15 }} />
-              </IconButton>
-            </Tooltip>
-          )}
-          <Tooltip title="Comments">
-            <IconButton size="small" onClick={() => onOpenComments(task)}
-              sx={{ color: hasComments ? 'primary.main' : 'text.disabled' }}>
-              {hasComments
-                ? <ChatBubbleIcon sx={{ fontSize: 16 }} />
-                : <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />}
-            </IconButton>
-          </Tooltip>
+          </Stack>
         </Stack>
-      </TableCell>
-    </TableRow>
+      </Stack>
+    </Paper>
   );
 }
 
@@ -220,33 +198,25 @@ const EMPTY_TASK_FORM: TaskForm = {
   start_date: '', due_date: '',
 };
 
-function TaskFormDialog({ open, editTarget, folderId, taskCount, onClose, onSaved }: {
-  open: boolean;
+function TaskFormDialog({ editTarget, folderId, taskCount, onClose, onSaved }: {
   editTarget: Task | null;
   folderId: string;
   taskCount: number;
   onClose: () => void;
   onSaved: (task: Task) => void;
 }) {
-  const [form, setForm] = useState<TaskForm>(EMPTY_TASK_FORM);
+  const [form, setForm] = useState<TaskForm>(() => editTarget ? {
+    title: editTarget.title,
+    description: editTarget.description ?? '',
+    group_label: editTarget.group_label ?? '',
+    type: editTarget.type ?? '',
+    role: editTarget.role ?? '',
+    estimated_hours: editTarget.estimated_hours != null ? String(editTarget.estimated_hours) : '',
+    start_date: editTarget.start_date ?? '',
+    due_date: editTarget.due_date ?? '',
+  } : EMPTY_TASK_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (open) {
-      setError('');
-      setForm(editTarget ? {
-        title: editTarget.title,
-        description: editTarget.description ?? '',
-        group_label: editTarget.group_label ?? '',
-        type: editTarget.type ?? '',
-        role: editTarget.role ?? '',
-        estimated_hours: editTarget.estimated_hours != null ? String(editTarget.estimated_hours) : '',
-        start_date: editTarget.start_date ?? '',
-        due_date: editTarget.due_date ?? '',
-      } : EMPTY_TASK_FORM);
-    }
-  }, [open, editTarget]);
 
   function set<K extends keyof TaskForm>(key: K, val: string) {
     setForm((p) => ({ ...p, [key]: val }));
@@ -282,7 +252,7 @@ function TaskFormDialog({ open, editTarget, folderId, taskCount, onClose, onSave
   }
 
   return (
-    <Dialog open={open} onClose={() => !saving && onClose()} maxWidth="sm" fullWidth>
+    <Dialog open onClose={() => !saving && onClose()} maxWidth="sm" fullWidth>
       <DialogTitle fontWeight={700}>{editTarget ? 'Edit task' : 'New task'}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
@@ -332,97 +302,19 @@ function TaskFormDialog({ open, editTarget, folderId, taskCount, onClose, onSave
   );
 }
 
-function GroupRow({ label, count: taskCount, open, onToggle }: { label: string; count: number; open: boolean; onToggle: () => void }) {
+function GroupHeader({ label, count, open, onToggle }: { label: string; count: number; open: boolean; onToggle: () => void }) {
   return (
-    <TableRow
+    <Stack direction="row" spacing={1} alignItems="center"
       onClick={onToggle}
-      sx={{ cursor: 'pointer', bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
-    >
-      <TableCell colSpan={6} sx={{ py: 1, px: 2 }}>
-        <Stack direction="row" spacing={1} alignItems="center">
-          {open ? <KeyboardArrowDownIcon sx={{ color: 'white', fontSize: 18 }} />
-                : <KeyboardArrowRightIcon sx={{ color: 'white', fontSize: 18 }} />}
-          <Typography variant="body2" fontWeight={700} sx={{ color: 'white', flex: 1 }}>{label}</Typography>
-          <Chip label={taskCount} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.25)', color: 'white', fontWeight: 700, height: 20, fontSize: 11 }} />
-        </Stack>
-      </TableCell>
-    </TableRow>
-  );
-}
-
-// ── Timeline / Gantt view ──────────────────────────────────────────────────
-
-function TimelineView({ tasks }: { tasks: Task[] }) {
-  const dated = tasks.filter((t) => t.start_date && t.due_date);
-  if (dated.length === 0) {
-    return <Typography variant="body2" color="text.secondary" sx={{ p: 3 }}>No dates assigned. Import a decomposition first.</Typography>;
-  }
-
-  const minDate = new Date(dated.reduce((m, t) => t.start_date! < m ? t.start_date! : m, dated[0].start_date!));
-  const maxDate = new Date(dated.reduce((m, t) => t.due_date! > m ? t.due_date! : m, dated[0].due_date!));
-  const totalDays = Math.ceil((maxDate.getTime() - minDate.getTime()) / 86400000) + 1;
-
-  function pct(dateStr: string) {
-    const d = new Date(dateStr);
-    return Math.max(0, Math.min(100, ((d.getTime() - minDate.getTime()) / 86400000) / totalDays * 100));
-  }
-  function width(start: string, end: string) {
-    const s = new Date(start).getTime();
-    const e = new Date(end).getTime();
-    return Math.max(0.5, (e - s) / 86400000 / totalDays * 100);
-  }
-
-  const months: { label: string; pct: number }[] = [];
-  const cur = new Date(minDate);
-  cur.setDate(1);
-  while (cur <= maxDate) {
-    months.push({
-      label: cur.toLocaleDateString('en', { month: 'short', year: '2-digit' }),
-      pct: Math.max(0, (cur.getTime() - minDate.getTime()) / 86400000 / totalDays * 100),
-    });
-    cur.setMonth(cur.getMonth() + 1);
-  }
-
-  const s = STATUSES;
-  return (
-    <Box sx={{ overflowX: 'auto' }}>
-      <Box sx={{ minWidth: 700 }}>
-        {/* Month headers */}
-        <Box sx={{ position: 'relative', height: 28, ml: '200px', borderBottom: 1, borderColor: 'divider' }}>
-          {months.map((m) => (
-            <Typography key={m.label} variant="caption" color="text.secondary" fontWeight={600}
-              sx={{ position: 'absolute', left: `${m.pct}%`, transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-              {m.label}
-            </Typography>
-          ))}
-        </Box>
-        {/* Rows */}
-        {dated.map((task) => {
-          const st = s.find((x) => x.value === task.status) ?? s[0];
-          return (
-            <Stack key={task.id} direction="row" alignItems="center" sx={{ height: 36, borderBottom: 1, borderColor: 'divider' }}>
-              <Box sx={{ width: 200, flexShrink: 0, pr: 1.5, overflow: 'hidden' }}>
-                <Tooltip title={task.title}>
-                  <Typography variant="caption" fontWeight={500} noWrap>{task.title}</Typography>
-                </Tooltip>
-              </Box>
-              <Box sx={{ flex: 1, position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
-                <Tooltip title={`${task.start_date} → ${task.due_date} | ${task.estimated_hours ?? '?'} h | ${st.label}`}>
-                  <Box sx={{
-                    position: 'absolute',
-                    left: `${pct(task.start_date!)}%`,
-                    width: `${width(task.start_date!, task.due_date!)}%`,
-                    height: 18, borderRadius: 1,
-                    bgcolor: st.color + 'cc',
-                    minWidth: 4,
-                  }} />
-                </Tooltip>
-              </Box>
-            </Stack>
-          );
-        })}
-      </Box>
-    </Box>
+      sx={{ px: 1.5, py: 1, bgcolor: 'primary.main', borderRadius: 2, cursor: 'pointer',
+        '&:hover': { bgcolor: 'primary.dark' }, transition: 'background 0.15s' }}>
+      {open
+        ? <KeyboardArrowDownIcon sx={{ color: 'white', fontSize: 18 }} />
+        : <KeyboardArrowRightIcon sx={{ color: 'white', fontSize: 18 }} />}
+      <Typography variant="body2" fontWeight={700} sx={{ color: 'white', flex: 1 }}>{label}</Typography>
+      <Chip label={count} size="small"
+        sx={{ bgcolor: 'rgba(255,255,255,0.25)', color: 'white', fontWeight: 700, height: 20, fontSize: 11 }} />
+    </Stack>
   );
 }
 
@@ -562,11 +454,11 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, cur
 
   useEffect(() => { setTasks(initialTasks); }, [initialTasks]);
 
-  const [view, setView] = useState<'table' | 'timeline'>('table');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [commentCounts, setCommentCounts] = useState<Map<string, number>>(new Map());
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [dialogKey, setDialogKey] = useState(0);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [filterRole, setFilterRole] = useState('');
@@ -591,11 +483,13 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, cur
 
   function openCreate() {
     setEditTarget(null);
+    setDialogKey((k) => k + 1);
     setTaskDialogOpen(true);
   }
 
   function openEdit(task: Task) {
     setEditTarget(task);
+    setDialogKey((k) => k + 1);
     setTaskDialogOpen(true);
   }
 
@@ -665,12 +559,10 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, cur
       {/* Header */}
       <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }}
         justifyContent="space-between" spacing={1} mb={2}>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Tabs value={view} onChange={(_, v) => setView(v)} sx={{ minHeight: 36 }}>
-            <Tab value="table" label="Table" sx={{ minHeight: 36, py: 0 }} />
-            <Tab value="timeline" label="Timeline" sx={{ minHeight: 36, py: 0 }} />
-          </Tabs>
-          <Typography variant="caption" color="text.secondary">{tasks.length} tasks · {progress}% done</Typography>
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <Typography variant="caption" color="text.secondary" fontWeight={500}>
+            {tasks.length} tasks · {progress}% done
+          </Typography>
         </Stack>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           {allRoles.length > 0 && (
@@ -686,14 +578,12 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, cur
             {STATUSES.map((s) => <MenuItem key={s.value} value={s.value} sx={{ fontSize: 13 }}>{s.label}</MenuItem>)}
           </Select>
           {isAdmin && (
-            <Button size="small" variant="contained" startIcon={<AddIcon />}
-              onClick={openCreate}>
+            <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
               New task
             </Button>
           )}
           {isAdmin && (
-            <Button size="small" variant="outlined" startIcon={<UploadIcon />}
-              onClick={() => setImportOpen(true)}>
+            <Button size="small" variant="outlined" startIcon={<UploadIcon />} onClick={() => setImportOpen(true)}>
               Import
             </Button>
           )}
@@ -702,7 +592,7 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, cur
 
       {/* Progress bar */}
       {tasks.length > 0 && (
-        <Box mb={2}>
+        <Box mb={2.5}>
           <LinearProgress variant="determinate" value={progress} sx={{ height: 6, borderRadius: 3 }} />
         </Box>
       )}
@@ -716,52 +606,44 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, cur
             </Button>
           )}
         </Paper>
-      ) : view === 'timeline' ? (
-        <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden', p: 2 }}>
-          <TimelineView tasks={filtered} />
-        </Paper>
       ) : (
-        <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 700, pl: 4 }}>Task / Deliverable</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="right">Hours</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="center" />
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {groups.map((group) => {
-                  const groupTasks = filtered.filter((t) => t.group_label === group);
-                  const isOpen = !collapsedGroups.has(group);
-                  return [
-                    <GroupRow key={`g-${group}`} label={group} count={groupTasks.length}
-                      open={isOpen} onToggle={() => toggleGroup(group)} />,
-                    ...(isOpen ? groupTasks.map((t) => (
-                      <TaskRow key={t.id} task={t} isAdmin={isAdmin}
+        <Stack spacing={2}>
+          {/* Grouped tasks */}
+          {groups.map((group) => {
+            const groupTasks = filtered.filter((t) => t.group_label === group);
+            const isOpen = !collapsedGroups.has(group);
+            return (
+              <Box key={group}>
+                <GroupHeader label={group} count={groupTasks.length} open={isOpen} onToggle={() => toggleGroup(group)} />
+                {isOpen && (
+                  <Stack spacing={1} mt={1}>
+                    {groupTasks.map((t) => (
+                      <TaskCard key={t.id} task={t} isAdmin={isAdmin}
                         hasComments={(commentCounts.get(t.id) ?? 0) > 0}
                         onStatusChange={handleStatusChange} onOpenComments={setActiveTask}
                         onEdit={openEdit} onDelete={handleDelete} />
-                    )) : []),
-                  ];
-                })}
-                {ungrouped.map((t) => (
-                  <TaskRow key={t.id} task={t} isAdmin={isAdmin}
-                    hasComments={(commentCounts.get(t.id) ?? 0) > 0}
-                    onStatusChange={handleStatusChange} onOpenComments={setActiveTask}
-                    onEdit={openEdit} onDelete={handleDelete} />
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                    ))}
+                  </Stack>
+                )}
+              </Box>
+            );
+          })}
 
-          {/* Summary row */}
+          {/* Ungrouped tasks */}
+          {ungrouped.length > 0 && (
+            <Stack spacing={1}>
+              {ungrouped.map((t) => (
+                <TaskCard key={t.id} task={t} isAdmin={isAdmin}
+                  hasComments={(commentCounts.get(t.id) ?? 0) > 0}
+                  onStatusChange={handleStatusChange} onOpenComments={setActiveTask}
+                  onEdit={openEdit} onDelete={handleDelete} />
+              ))}
+            </Stack>
+          )}
+
+          {/* Footer summary */}
           <Divider />
-          <Stack direction="row" spacing={2} sx={{ px: 3, py: 1.5 }} flexWrap="wrap" useFlexGap>
+          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
             <Typography variant="caption" color="text.secondary">
               Total: <strong>{tasks.reduce((s, t) => s + (t.estimated_hours ?? 0), 0)} h</strong>
             </Typography>
@@ -775,19 +657,21 @@ export function TasksView({ initialTasks, folderId, projectStartAt, isAdmin, cur
               );
             })}
           </Stack>
-        </Paper>
+        </Stack>
       )}
 
       <CommentsDrawer task={activeTask} currentUser={currentUser} onClose={() => setActiveTask(null)} onCommentAdded={handleCommentAdded} />
 
-      <TaskFormDialog
-        open={taskDialogOpen}
-        editTarget={editTarget}
-        folderId={folderId}
-        taskCount={tasks.length}
-        onClose={() => setTaskDialogOpen(false)}
-        onSaved={handleTaskSaved}
-      />
+      {taskDialogOpen && (
+        <TaskFormDialog
+          key={dialogKey}
+          editTarget={editTarget}
+          folderId={folderId}
+          taskCount={tasks.length}
+          onClose={() => setTaskDialogOpen(false)}
+          onSaved={handleTaskSaved}
+        />
+      )}
 
       {importError && (
         <Alert severity="error" onClose={() => setImportError('')} sx={{ mt: 2 }}>

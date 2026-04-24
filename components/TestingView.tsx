@@ -243,26 +243,6 @@ export function TestingView({ folderId, currentUser }: { folderId: string; curre
 
   return (
     <Box>
-      {/* Progress header */}
-      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={1} mb={2}>
-        <Typography variant="h6" fontWeight={700}>Testing</Typography>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Typography variant="body2" sx={{ color: STATUS_META.pass.color, fontWeight: 600 }}>{passed} passed</Typography>
-          {failed > 0 && <Typography variant="body2" sx={{ color: STATUS_META.fail.color, fontWeight: 600 }}>{failed} failed</Typography>}
-          {blocked > 0 && <Typography variant="body2" sx={{ color: STATUS_META.blocked.color, fontWeight: 600 }}>{blocked} blocked</Typography>}
-          <Typography variant="body2" color="text.secondary">/ {total} total</Typography>
-        </Stack>
-      </Stack>
-
-      <Stack direction="row" spacing={1} alignItems="center" mb={3}>
-        <LinearProgress
-          variant="determinate"
-          value={progressPct}
-          sx={{ flex: 1, borderRadius: 2, height: 8, bgcolor: '#e0e0e0', '& .MuiLinearProgress-bar': { bgcolor: STATUS_META.pass.color } }}
-        />
-        <Typography variant="caption" fontWeight={700} color="text.secondary">{progressPct}%</Typography>
-      </Stack>
-
       {/* Table */}
       <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
         <TableContainer>
@@ -331,7 +311,8 @@ export function TestingView({ folderId, currentUser }: { folderId: string; curre
                       <TableRow
                         key={step.id}
                         hover
-                        sx={{ '& td': { borderBottom: isExpanded ? 'none' : undefined } }}
+                        onClick={() => setExpandedStep(isExpanded ? null : step.id)}
+                        sx={{ cursor: 'pointer', '& td': { borderBottom: isExpanded ? 'none' : undefined } }}
                       >
                         {/* # */}
                         <TableCell sx={{ px: 1.5, py: 1, color: 'text.disabled', fontSize: 11, fontWeight: 600 }}>

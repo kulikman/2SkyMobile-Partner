@@ -404,12 +404,11 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
             <Table size="small" sx={{ tableLayout: 'fixed' }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 36, borderBottom: '1px solid', borderColor: 'divider' }} />
                   <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}>Issue / Title</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 160, borderBottom: '1px solid', borderColor: 'divider' }}>Type</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 180, borderBottom: '1px solid', borderColor: 'divider' }}>Module</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 180, borderBottom: '1px solid', borderColor: 'divider' }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 96, borderBottom: '1px solid', borderColor: 'divider' }} />
+                  <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 112, borderBottom: '1px solid', borderColor: 'divider' }} />
                 </TableRow>
               </TableHead>
 
@@ -420,7 +419,7 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
                     /* Group header row */
                     <TableRow key={`grp-${priority.value}`}>
                       <TableCell
-                        colSpan={6}
+                        colSpan={5}
                         sx={{ p: 0, bgcolor: priority.color }}
                       >
                         <Stack
@@ -468,19 +467,6 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
                           hover
                           sx={{ '& td': { borderBottom: isOpen ? 'none' : undefined } }}
                         >
-                          {/* Expand toggle */}
-                          <TableCell sx={{ px: 1, py: 0.5 }}>
-                            <IconButton
-                              size="small"
-                              onClick={() => setExpandedTicket(isOpen ? null : ticket.id)}
-                              sx={{ color: hasComments ? 'primary.main' : 'text.disabled', p: 0.25 }}
-                            >
-                              {hasComments
-                                ? <ChatBubbleIcon sx={{ fontSize: 15 }} />
-                                : <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />}
-                            </IconButton>
-                          </TableCell>
-
                           {/* Title */}
                           <TableCell sx={{ py: 1 }}>
                             <Typography variant="body2" fontWeight={600} noWrap>
@@ -568,6 +554,15 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
                                   <DeleteIcon sx={{ fontSize: 15 }} />
                                 </IconButton>
                               )}
+                              <IconButton
+                                size="small"
+                                onClick={() => setExpandedTicket(isOpen ? null : ticket.id)}
+                                sx={{ color: hasComments ? 'primary.main' : 'text.disabled', p: 0.25 }}
+                              >
+                                {hasComments
+                                  ? <ChatBubbleIcon sx={{ fontSize: 15 }} />
+                                  : <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />}
+                              </IconButton>
                             </Stack>
                           </TableCell>
                         </TableRow>,
@@ -575,7 +570,7 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
                         /* Expanded detail row */
                         isOpen ? (
                           <TableRow key={`${ticket.id}-detail`}>
-                            <TableCell colSpan={6} sx={{ pb: 2, pt: 0, bgcolor: '#f8fafc' }}>
+                            <TableCell colSpan={5} sx={{ pb: 2, pt: 0, bgcolor: '#f8fafc' }}>
                               <Box sx={{ px: 2 }}>
                                 <Collapse in={isOpen}>
                                   <Stack spacing={1.5} pt={1.5}>
@@ -688,15 +683,6 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
                   const hasComments = threadComments.length > 0;
                   return [
                     <TableRow key={ticket.id} hover sx={{ '& td': { borderBottom: isOpen ? 'none' : undefined } }}>
-                      <TableCell sx={{ px: 1, py: 0.5 }}>
-                        <IconButton size="small"
-                          onClick={() => setExpandedTicket(isOpen ? null : ticket.id)}
-                          sx={{ color: hasComments ? 'primary.main' : 'text.disabled', p: 0.25 }}>
-                          {hasComments
-                            ? <ChatBubbleIcon sx={{ fontSize: 15 }} />
-                            : <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />}
-                        </IconButton>
-                      </TableCell>
                       <TableCell sx={{ py: 1 }}>
                         <Typography variant="body2" fontWeight={600} noWrap>{ticket.title}</Typography>
                         <Typography variant="caption" color="text.secondary" noWrap>{ticket.created_by_email}</Typography>
@@ -715,15 +701,22 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
                         </Select>
                       </TableCell>
                       <TableCell align="right" sx={{ py: 0.5 }} onClick={(e) => e.stopPropagation()}>
-                        <Stack direction="row" spacing={0.25} justifyContent="flex-end">
+                        <Stack direction="row" spacing={0.25} justifyContent="flex-end" alignItems="center">
                           {isAdmin && <IconButton size="small" onClick={() => openEdit(ticket)}><EditIcon sx={{ fontSize: 15 }} /></IconButton>}
                           {isAdmin && <IconButton size="small" color="error" onClick={() => deleteTicket(ticket.id)}><DeleteIcon sx={{ fontSize: 15 }} /></IconButton>}
+                          <IconButton size="small"
+                            onClick={() => setExpandedTicket(isOpen ? null : ticket.id)}
+                            sx={{ color: hasComments ? 'primary.main' : 'text.disabled', p: 0.25 }}>
+                            {hasComments
+                              ? <ChatBubbleIcon sx={{ fontSize: 15 }} />
+                              : <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />}
+                          </IconButton>
                         </Stack>
                       </TableCell>
                     </TableRow>,
                     isOpen ? (
                       <TableRow key={`${ticket.id}-detail`}>
-                        <TableCell colSpan={6} sx={{ pb: 2, pt: 0, bgcolor: '#f8fafc' }}>
+                        <TableCell colSpan={5} sx={{ pb: 2, pt: 0, bgcolor: '#f8fafc' }}>
                           <Box sx={{ px: 2 }}>
                             <Collapse in={isOpen}>
                               <Stack spacing={1.5} pt={1.5}>
