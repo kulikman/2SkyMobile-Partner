@@ -87,6 +87,16 @@ export function Navbar({ isAdmin, userId }: { isAdmin: boolean; userId?: string 
                 </Button>
                 <Button
                   component={Link}
+                  href="/admin/briefs"
+                  size="small"
+                  variant="text"
+                  color="inherit"
+                  sx={{ minWidth: { xs: 'auto', md: 64 }, px: { xs: 1, md: 1.5 } }}
+                >
+                  Briefs
+                </Button>
+                <Button
+                  component={Link}
                   href="/admin/users"
                   size="small"
                   variant="text"
