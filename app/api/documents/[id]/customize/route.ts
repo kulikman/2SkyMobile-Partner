@@ -8,7 +8,8 @@ export async function PATCH(
   const { id } = await params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (user?.user_metadata?.role !== 'admin') {
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (user.user_metadata?.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

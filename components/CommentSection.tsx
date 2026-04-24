@@ -54,12 +54,18 @@ export function CommentSection({ documentId, userId }: { documentId: string; use
     e.preventDefault();
     if (!text.trim()) return;
     setLoading(true);
-    await supabase.from('comments').insert({ document_id: documentId, user_id: userId, content: text.trim() });
-    setText('');
-    setLoading(false);
+    try {
+      const { error } = await supabase
+        .from('comments')
+        .insert({ document_id: documentId, user_id: userId, content: text.trim() });
+      if (!error) setText('');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function deleteComment(id: string) {
+    if (!window.confirm('Delete this comment?')) return;
     await supabase.from('comments').delete().eq('id', id);
   }
 

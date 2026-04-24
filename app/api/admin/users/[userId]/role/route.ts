@@ -14,8 +14,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ use
   const role = body.get('role') as string;
 
   const adminClient = await createAdminClient();
+
+  // Fetch current metadata first to avoid overwriting other fields (company_id, name, etc.)
+  const { data: existing } = await adminClient.auth.admin.getUserById(userId);
+  const currentMeta = existing?.user?.user_metadata ?? {};
+
   const { error } = await adminClient.auth.admin.updateUserById(userId, {
-    user_metadata: { role },
+    user_metadata: { ...currentMeta, role },
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

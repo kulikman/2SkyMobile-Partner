@@ -28,11 +28,15 @@ export async function PATCH(
   if (fetchError || !current) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const docUpdates: Record<string, unknown> = {};
-  if (body.title !== undefined) { docUpdates.title = body.title; docUpdates.content = body.title; }
+  // title and content are independent fields
+  if (body.title !== undefined) docUpdates.title = body.title;
 
   const meta = { ...(current.metadata as Record<string, unknown>) };
   if (body.meeting_date !== undefined) meta.meeting_date = body.meeting_date;
-  if (body.summary !== undefined) { meta.summary = body.summary; docUpdates.content = body.summary ?? ''; }
+  if (body.summary !== undefined) {
+    meta.summary = body.summary;
+    docUpdates.content = body.summary ?? ''; // content stores the summary text
+  }
   docUpdates.metadata = meta;
 
   const { data, error } = await adminClient
