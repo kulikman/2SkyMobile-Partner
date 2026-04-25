@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { buildSecurityHeaders } from '@/lib/security-headers';
 
 export async function proxy(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -77,6 +78,14 @@ export async function proxy(request: NextRequest) {
     if (role !== 'admin') {
       return NextResponse.redirect(new URL('/', request.url));
     }
+  }
+
+  // Attach security headers to every response.
+  const securityHeaders = buildSecurityHeaders({
+    isDev: process.env.NODE_ENV !== 'production',
+  });
+  for (const [key, value] of Object.entries(securityHeaders)) {
+    supabaseResponse.headers.set(key, value);
   }
 
   return supabaseResponse;
