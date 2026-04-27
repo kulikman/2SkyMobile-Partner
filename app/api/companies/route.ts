@@ -65,5 +65,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: authError.message }, { status: 500 });
   }
 
+  // Link the new user to the company as a member
+  await adminClient
+    .from('company_members')
+    .insert({ company_id: company.id, user_id: authData.user.id });
+
   return NextResponse.json({ company, user: authData.user }, { status: 201 });
 }

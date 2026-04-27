@@ -64,8 +64,21 @@ export async function POST(
       email_confirm: true,
       user_metadata: { role: 'viewer' },
     });
-    if (createErr) return NextResponse.json({ error: createErr.message }, { status: 500 });
-    resolvedUserId = created.user.id;
+    if (createErr) {
+      // If the user already exists in auth, find and reuse them
+      if (createErr.message?.toLowerCase().includes('already') || createErr.status === 422) {
+        const { data: { users } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+        const existing = users.find((u) => u.email?.toLowerCase() === email.trim().toLowerCase());
+        if (!existing) return NextResponse.json({ error: createErr.message }, { status: 500 });
+        resolvedUserId = existing.id;
+        // Update password for the existing user
+        await adminClient.auth.admin.updateUserById(existing.id, { password });
+      } else {
+        return NextResponse.json({ error: createErr.message }, { status: 500 });
+      }
+    } else {
+      resolvedUserId = created.user.id;
+    }
   }
 
   const { data, error } = await adminClient
