@@ -20,20 +20,18 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!docs?.length) return NextResponse.json([]);
 
-  // Folders
+  // Folders — guard against empty array (Supabase throws on .in('id', []))
   const folderIds = [...new Set(docs.map((d) => d.folder_id))];
-  const { data: folders } = await adminClient
-    .from('folders')
-    .select('id, title, slug, company_id')
-    .in('id', folderIds);
+  const { data: folders } = folderIds.length
+    ? await adminClient.from('folders').select('id, title, slug, company_id').in('id', folderIds)
+    : { data: [] as { id: string; title: string; slug: string; company_id: string }[] };
   const folderMap = new Map(folders?.map((f) => [f.id, f]) ?? []);
 
-  // Companies
+  // Companies — same guard
   const companyIds = [...new Set(folders?.map((f) => f.company_id).filter(Boolean) ?? [])];
-  const { data: companies } = await adminClient
-    .from('companies')
-    .select('id, name, slug')
-    .in('id', companyIds);
+  const { data: companies } = companyIds.length
+    ? await adminClient.from('companies').select('id, name, slug').in('id', companyIds)
+    : { data: [] as { id: string; name: string; slug: string }[] };
   const companyMap = new Map(companies?.map((c) => [c.id, c]) ?? []);
 
   // User emails

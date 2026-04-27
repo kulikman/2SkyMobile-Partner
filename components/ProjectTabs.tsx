@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
@@ -24,6 +25,7 @@ export function ProjectTabs({
   isAdmin,
   currentUser,
   canonicalBase,
+  initialTab = 0,
 }: {
   folderId: string;
   reports: ReportDoc[];
@@ -31,8 +33,9 @@ export function ProjectTabs({
   isAdmin: boolean;
   currentUser: CurrentUser;
   canonicalBase?: string;
+  initialTab?: number;
 }) {
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(initialTab);
 
   return (
     <Box>
@@ -89,7 +92,9 @@ export function ProjectTabs({
       {/* 5 — Issues */}
       <Box sx={{ display: tab === 5 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
-          <IssuesView folderId={folderId} isAdmin={isAdmin} currentUser={currentUser} />
+          <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress size={28} /></Box>}>
+            <IssuesView folderId={folderId} isAdmin={isAdmin} currentUser={currentUser} />
+          </Suspense>
         </Paper>
       </Box>
     </Box>

@@ -37,13 +37,26 @@ const RESERVED = new Set([
   'folders', 'api', 'c', '_not-found',
 ]);
 
+const TAB_NAME_TO_INDEX: Record<string, number> = {
+  reports: 0, techstack: 1, 'tech-stack': 1,
+  documentation: 2, docs: 2,
+  meetings: 3,
+  testing: 4,
+  issues: 5,
+};
+
 export default async function SpacePathPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ company: string; path: string[] }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { company: companySlug, path } = await params;
+  const sp: Record<string, string | string[] | undefined> = searchParams ? await searchParams : {};
   if (RESERVED.has(companySlug)) notFound();
+  const tabParam = typeof sp.tab === 'string' ? sp.tab.toLowerCase() : '';
+  const initialTab = TAB_NAME_TO_INDEX[tabParam] ?? 0;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -198,6 +211,7 @@ export default async function SpacePathPage({
             isAdmin={isAdmin}
             currentUser={currentUser}
             canonicalBase={`/${companySlug}/${path[0]}`}
+            initialTab={initialTab}
           />
         </Container>
       </Box>
