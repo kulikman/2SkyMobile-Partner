@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
   catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
   const { folder_id, title, description, url, screenshot_path,
-    module, type, priority, severity, comments, parent_id } = body;
+    module, type, priority, severity, comments, parent_id, assigned_to } = body;
 
   if (!folder_id || !title?.trim()) {
     return NextResponse.json({ error: 'folder_id and title required' }, { status: 400 });
@@ -81,6 +81,17 @@ export async function POST(req: NextRequest) {
   const slug = `${toSlug(title.trim()) || 'ticket'}-i-${randomBytes(4).toString('hex')}`;
 
   const adminClient = await createAdminClient();
+
+  // Generate ticket number (count-based, good enough for this scale)
+  let ticketNumber: number | null = null;
+  try {
+    const { count } = await adminClient
+      .from('documents')
+      .select('*', { count: 'exact', head: true })
+      .eq('doc_type', 'ticket');
+    ticketNumber = (count ?? 0) + 1;
+  } catch { /* best-effort */ }
+
   const { data, error } = await adminClient
     .from('documents')
     .insert({
@@ -99,8 +110,10 @@ export async function POST(req: NextRequest) {
         url: url?.trim() ?? null,
         screenshot_path: screenshot_path ?? null,
         created_by: user.id,
+        assigned_to: assigned_to ?? null,
         comments: comments?.trim() ?? null,
         parent_id: parent_id ?? null,
+        ticket_number: ticketNumber,
         updated_at: new Date().toISOString(),
       },
     })

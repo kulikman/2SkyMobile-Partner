@@ -20,7 +20,7 @@ export async function PATCH(
 
   const isAdmin = user.user_metadata?.role === 'admin';
   const { status, title, description, url, screenshot_path,
-    module, type, priority, severity, comments } = body;
+    module, type, priority, severity, comments, assigned_to } = body;
 
   if (status && !VALID_STATUSES.includes(status)) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
@@ -76,7 +76,8 @@ export async function PATCH(
     if (priority !== undefined)        meta.priority = priority;
     if (severity !== undefined)        meta.severity = severity;
     if (comments !== undefined)        meta.comments = comments?.trim() ?? null;
-    if (body.parent_id !== undefined)  meta.parent_id = body.parent_id;
+    if (body.parent_id !== undefined)   meta.parent_id = body.parent_id;
+    if (assigned_to !== undefined)      meta.assigned_to = assigned_to ?? null;
   }
   docUpdates.metadata = meta;
 

@@ -110,6 +110,7 @@ type Ticket = {
   created_by_email: string;
   created_at: string;
   updated_at: string;
+  ticket_number: number | null;
 };
 
 type FormState = {
@@ -132,6 +133,11 @@ const EMPTY_FORM: FormState = {
 
 function statusMeta(value: string) {
   return STATUSES.find((s) => s.value === value) ?? { label: value, color: '#9e9e9e' };
+}
+
+function ticketNum(n: number | null | undefined) {
+  if (!n) return null;
+  return `#${String(n).padStart(3, '0')}`;
 }
 
 function TypeChip({ type }: { type: string | null }) {
@@ -211,6 +217,12 @@ function IssueDrawer({
         <Stack direction="row" alignItems="flex-start" spacing={1}>
           <Box flex={1}>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+              {ticketNum(ticket.ticket_number) && (
+                <Typography variant="caption" fontWeight={700}
+                  sx={{ fontFamily: 'monospace', color: 'text.disabled', letterSpacing: 0 }}>
+                  {ticketNum(ticket.ticket_number)}
+                </Typography>
+              )}
               <TypeChip type={ticket.type} />
               {ticket.module && (
                 <Typography variant="caption" color="text.secondary" noWrap>{ticket.module}</Typography>
@@ -662,6 +674,14 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
         onClick={() => setDrawerTicketId(ticket.id)}
         sx={{ cursor: 'pointer' }}
       >
+        {/* # */}
+        <TableCell sx={{ py: 1, width: 52 }}>
+          <Typography variant="caption" fontWeight={700}
+            sx={{ fontFamily: 'monospace', color: 'text.disabled', whiteSpace: 'nowrap' }}>
+            {ticketNum(ticket.ticket_number) ?? '—'}
+          </Typography>
+        </TableCell>
+
         {/* Title */}
         <TableCell sx={{ py: 1 }}>
           <Typography variant="body2" fontWeight={600} noWrap>{ticket.title}</Typography>
@@ -753,6 +773,7 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
             <Table size="small" sx={{ tableLayout: 'fixed' }}>
               <TableHead>
                 <TableRow>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 52, borderBottom: '1px solid', borderColor: 'divider' }}>#</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}>Issue / Title</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 160, borderBottom: '1px solid', borderColor: 'divider' }}>Type</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: 12, py: 1.25, width: 180, borderBottom: '1px solid', borderColor: 'divider' }}>Module</TableCell>
@@ -766,7 +787,7 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
                   const isCollapsed = collapsedGroups.has(priority.value);
                   return [
                     <TableRow key={`grp-${priority.value}`}>
-                      <TableCell colSpan={5} sx={{ p: 0, bgcolor: priority.color }}>
+                      <TableCell colSpan={6} sx={{ p: 0, bgcolor: priority.color }}>
                         <Stack direction="row" alignItems="center" spacing={1}
                           sx={{ px: 1.5, py: 0.75, cursor: 'pointer' }}
                           onClick={() => toggleGroup(priority.value)}>
