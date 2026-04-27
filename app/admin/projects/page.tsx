@@ -35,6 +35,7 @@ export default async function AdminProjectsPage() {
     deadline_at: f.deadline_at ?? null,
     position: f.position ?? 0,
     company_id: (f as Record<string, unknown>).company_id as string | null ?? null,
+    partner_visible: (f as Record<string, unknown>).partner_visible as boolean ?? true,
   }));
 
   return (

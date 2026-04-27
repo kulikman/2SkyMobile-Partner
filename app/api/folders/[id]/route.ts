@@ -32,8 +32,9 @@ export async function PATCH(
   if (body.started_at !== undefined)  updates.started_at  = body.started_at;
   if (body.deadline_at !== undefined) updates.deadline_at = body.deadline_at;
   if (body.company_id !== undefined)  updates.company_id  = body.company_id;
-  if (body.stage_url !== undefined)   updates.stage_url   = body.stage_url;
-  if (body.tech_spec !== undefined)   updates.tech_spec   = body.tech_spec;
+  if (body.stage_url !== undefined)        updates.stage_url        = body.stage_url;
+  if (body.tech_spec !== undefined)        updates.tech_spec        = body.tech_spec;
+  if (body.partner_visible !== undefined)  updates.partner_visible  = body.partner_visible;
 
   const adminClient = await createAdminClient();
   const { data, error } = await adminClient

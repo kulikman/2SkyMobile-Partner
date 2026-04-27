@@ -14,10 +14,14 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
+import Tooltip from '@mui/material/Tooltip';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import FolderOffIcon from '@mui/icons-material/FolderOff';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
 type Project = {
   id: string;
@@ -31,6 +35,7 @@ type Project = {
   deadline_at: string | null;
   position: number;
   company_id: string | null;
+  partner_visible: boolean;
 };
 
 type Company = {
@@ -75,6 +80,7 @@ export function AdminProjectsClient({
   const [editStartedAt, setEditStartedAt] = useState('');
   const [editDeadlineAt, setEditDeadlineAt] = useState('');
   const [editCompanyId, setEditCompanyId] = useState<string>('');
+  const [editPartnerVisible, setEditPartnerVisible] = useState(true);
   const [saving, setSaving] = useState(false);
 
   function openEdit(p: Project) {
@@ -84,6 +90,7 @@ export function AdminProjectsClient({
     setEditStartedAt(p.started_at?.split('T')[0] ?? '');
     setEditDeadlineAt(p.deadline_at?.split('T')[0] ?? '');
     setEditCompanyId(p.company_id ?? '');
+    setEditPartnerVisible(p.partner_visible ?? true);
   }
 
   async function createProject() {
@@ -114,6 +121,7 @@ export function AdminProjectsClient({
         deadline_at: data.deadline_at ?? null,
         position: data.position ?? 0,
         company_id: data.company_id ?? null,
+        partner_visible: data.partner_visible ?? true,
       }]);
       setCreateOpen(false);
       setNewName('');
@@ -136,6 +144,7 @@ export function AdminProjectsClient({
         started_at: editStartedAt || null,
         deadline_at: editDeadlineAt || null,
         company_id: editCompanyId || null,
+        partner_visible: editPartnerVisible,
       }),
     });
     if (res.ok) {
@@ -151,6 +160,7 @@ export function AdminProjectsClient({
                 started_at: data.started_at ?? null,
                 deadline_at: data.deadline_at ?? null,
                 company_id: data.company_id ?? null,
+                partner_visible: data.partner_visible ?? true,
               }
             : p,
         ),
@@ -324,6 +334,28 @@ export function AdminProjectsClient({
                 fullWidth
               />
             </Stack>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={editPartnerVisible}
+                  onChange={(e) => setEditPartnerVisible(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body2" fontWeight={500}>
+                    Visible to partner
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {editPartnerVisible
+                      ? 'Project appears in the partner dashboard'
+                      : 'Project is hidden from partners'}
+                  </Typography>
+                </Box>
+              }
+            />
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -368,6 +400,18 @@ function ProjectRow({
               color={statusColors[p.status] ?? 'default'}
               variant="outlined"
             />
+            {!p.partner_visible && (
+              <Tooltip title="Hidden from partners">
+                <Chip
+                  icon={<VisibilityOffIcon sx={{ fontSize: '14px !important' }} />}
+                  label="Hidden"
+                  size="small"
+                  variant="outlined"
+                  color="default"
+                  sx={{ color: 'text.secondary', borderColor: 'divider', fontSize: 11 }}
+                />
+              </Tooltip>
+            )}
           </Stack>
           <Stack direction="row" spacing={0.5} alignItems="center">
             {p.deadline_at && (

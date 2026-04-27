@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Chip from '@mui/material/Chip';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -20,6 +21,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
+import UploadIcon from '@mui/icons-material/Upload';
 import BusinessIcon from '@mui/icons-material/Business';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -28,6 +30,7 @@ import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 type Company = {
   id: string;
@@ -95,6 +98,12 @@ export function AdminCompaniesClient({
   const [newPartnerShowPwd, setNewPartnerShowPwd] = useState(false);
   const [newPartnerError, setNewPartnerError] = useState('');
   const [newPartnerSaving, setNewPartnerSaving] = useState(false);
+
+  // Logo upload
+  const createLogoRef = useRef<HTMLInputElement>(null);
+  const editLogoRef   = useRef<HTMLInputElement>(null);
+  const [createLogoUploading, setCreateLogoUploading] = useState(false);
+  const [editLogoUploading,   setEditLogoUploading]   = useState(false);
 
   // Delete dialog
   const [deleteTarget, setDeleteTarget] = useState<Company | null>(null);
@@ -218,6 +227,36 @@ export function AdminCompaniesClient({
     }
   }
 
+  async function uploadLogo(
+    file: File,
+    setUploading: (v: boolean) => void,
+    setUrl: (url: string) => void,
+    setError: (e: string) => void,
+  ) {
+    setUploading(true);
+    try {
+      const res = await fetch('/api/companies/upload-logo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name }),
+      });
+      const { signedUrl, storagePath, publicUrl, error: urlErr } = await res.json();
+      if (urlErr || !signedUrl) { setError(urlErr ?? 'Failed to get upload URL'); return; }
+
+      const supabase = createClient();
+      const { error: uploadErr } = await supabase.storage
+        .from('company-logos')
+        .uploadToSignedUrl(storagePath, signedUrl, file, { contentType: file.type });
+      if (uploadErr) { setError(uploadErr.message); return; }
+
+      setUrl(publicUrl);
+    } catch {
+      setError('Upload error');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
@@ -316,23 +355,40 @@ export function AdminCompaniesClient({
                 fullWidth
                 autoFocus
               />
-              <TextField
-                label="Logo URL"
-                placeholder="https://example.com/logo.png"
-                value={editLogoUrl}
-                onChange={(e) => setEditLogoUrl(e.target.value)}
-                fullWidth
-                helperText="Leave blank to use initials"
-              />
-              {editLogoUrl && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box component="img" src={editLogoUrl} alt="preview"
-                    sx={{ width: 40, height: 40, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider' }}
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  />
-                  <Typography variant="caption" color="text.secondary">Preview</Typography>
-                </Box>
-              )}
+
+              {/* Logo upload */}
+              <Box>
+                <input
+                  ref={editLogoRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadLogo(file, setEditLogoUploading, setEditLogoUrl, setEditError);
+                    e.target.value = '';
+                  }}
+                />
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={editLogoUploading ? <CircularProgress size={14} color="inherit" /> : <UploadIcon />}
+                    onClick={() => editLogoRef.current?.click()}
+                    disabled={editLogoUploading}
+                  >
+                    {editLogoUploading ? 'Uploading…' : editLogoUrl ? 'Replace logo' : 'Upload logo'}
+                  </Button>
+                  {editLogoUrl && (
+                    <>
+                      <Box component="img" src={editLogoUrl} alt="logo preview"
+                        sx={{ width: 36, height: 36, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider' }} />
+                      <Button size="small" color="error" onClick={() => setEditLogoUrl('')}>Remove</Button>
+                    </>
+                  )}
+                </Stack>
+              </Box>
+
               {editError && <Typography variant="caption" color="error">{editError}</Typography>}
             </Stack>
           )}
@@ -455,23 +511,40 @@ export function AdminCompaniesClient({
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField label="Company name" value={newName} onChange={(e) => setNewName(e.target.value)} fullWidth autoFocus />
-            <TextField
-              label="Logo URL (optional)"
-              placeholder="https://example.com/logo.png"
-              value={newLogoUrl}
-              onChange={(e) => setNewLogoUrl(e.target.value)}
-              fullWidth
-              helperText="Public image URL — leave blank to use initials"
-            />
-            {newLogoUrl && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box component="img" src={newLogoUrl} alt="preview"
-                  sx={{ width: 40, height: 40, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider' }}
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-                <Typography variant="caption" color="text.secondary">Preview</Typography>
-              </Box>
-            )}
+
+            {/* Logo upload */}
+            <Box>
+              <input
+                ref={createLogoRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadLogo(file, setCreateLogoUploading, setNewLogoUrl, setCreateError);
+                  e.target.value = '';
+                }}
+              />
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={createLogoUploading ? <CircularProgress size={14} color="inherit" /> : <UploadIcon />}
+                  onClick={() => createLogoRef.current?.click()}
+                  disabled={createLogoUploading}
+                >
+                  {createLogoUploading ? 'Uploading…' : newLogoUrl ? 'Replace logo' : 'Upload logo'}
+                </Button>
+                {newLogoUrl && (
+                  <>
+                    <Box component="img" src={newLogoUrl} alt="logo preview"
+                      sx={{ width: 36, height: 36, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider' }} />
+                    <Button size="small" color="error" onClick={() => setNewLogoUrl('')}>Remove</Button>
+                  </>
+                )}
+              </Stack>
+            </Box>
+
             <Divider>
               <Typography variant="caption" color="text.secondary">Primary contact login</Typography>
             </Divider>

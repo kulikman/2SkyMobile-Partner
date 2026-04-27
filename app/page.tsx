@@ -20,7 +20,7 @@ export default async function HomePage() {
   // Always use adminClient for fetching to bypass RLS reliably
   const { data: rawFolders } = await adminClient
     .from("folders")
-    .select("id, name, slug, color, icon, status, progress, client_name, started_at, deadline_at, company_id")
+    .select("id, name, slug, color, icon, status, progress, client_name, started_at, deadline_at, company_id, partner_visible")
     .is("parent_id", null)
     .order("position", { ascending: true });
 
@@ -50,7 +50,10 @@ export default async function HomePage() {
           .select("company_id")
           .eq("user_id", user.id);
         const memberCompanyIds = new Set((memberships ?? []).map((m) => m.company_id));
-        return (rawFolders ?? []).filter((f) => f.company_id && memberCompanyIds.has(f.company_id));
+        return (rawFolders ?? []).filter(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (f) => f.company_id && memberCompanyIds.has(f.company_id) && (f as any).partner_visible !== false,
+        );
       })();
 
   const projects: ProjectForDashboard[] = visibleFolders.map((f) => {
