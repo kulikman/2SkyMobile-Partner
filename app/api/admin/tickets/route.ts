@@ -10,16 +10,10 @@ export async function GET() {
 
   const adminClient = await createAdminClient();
 
-  // Fetch all tickets with nested folder + company via FK join
+  // 1. Fetch all tickets
   const { data: docs, error } = await adminClient
     .from('documents')
-    .select(`
-      id, folder_id, title, description, created_at, metadata,
-      folder:folders!folder_id (
-        id, title, slug, company_id,
-        company:companies!company_id ( id, name, slug )
-      )
-    `)
+    .select('id, folder_id, title, description, created_at, metadata')
     .eq('doc_type', 'ticket')
     .order('created_at', { ascending: false });
 
@@ -29,7 +23,29 @@ export async function GET() {
   }
   if (!docs?.length) return NextResponse.json({ tickets: [], users: [] });
 
-  // Build user email map (for reporter + assignee)
+  // 2. Fetch folders for all unique folder_ids
+  const folderIds = [...new Set(docs.map((d) => d.folder_id).filter(Boolean))];
+  const folderMap = new Map<string, { id: string; title: string; slug: string; company_id: string }>();
+  if (folderIds.length) {
+    const { data: folders } = await adminClient
+      .from('folders')
+      .select('id, title, slug, company_id')
+      .in('id', folderIds);
+    (folders ?? []).forEach((f) => folderMap.set(f.id, f));
+  }
+
+  // 3. Fetch companies for all unique company_ids
+  const companyIds = [...new Set([...folderMap.values()].map((f) => f.company_id).filter(Boolean))];
+  const companyMap = new Map<string, { id: string; name: string; slug: string }>();
+  if (companyIds.length) {
+    const { data: companies } = await adminClient
+      .from('companies')
+      .select('id, name, slug')
+      .in('id', companyIds);
+    (companies ?? []).forEach((c) => companyMap.set(c.id, c));
+  }
+
+  // 4. Build user email map
   let userMap = new Map<string, string>();
   let allUsers: { id: string; email: string }[] = [];
   try {
@@ -42,11 +58,12 @@ export async function GET() {
     console.error('[admin/tickets] listUsers error:', e);
   }
 
+  // 5. Assemble
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tickets = docs.map((doc: any) => {
     const m = (doc.metadata ?? {}) as Record<string, unknown>;
-    const folder  = doc.folder  ?? null;
-    const company = folder?.company ?? null;
+    const folder  = folderMap.get(doc.folder_id) ?? null;
+    const company = folder ? (companyMap.get(folder.company_id) ?? null) : null;
     return {
       id:                doc.id,
       folder_id:         doc.folder_id,

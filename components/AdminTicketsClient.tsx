@@ -276,7 +276,7 @@ export function AdminTicketsClient() {
               key={s}
               onClick={() => setStatusF((p) => p === s ? '' : s)}
               sx={{
-                px: 1.5, py: 0.75, borderRadius: '8px', cursor: 'pointer',
+                width: 120, px: 1.5, py: 0.75, borderRadius: '8px', cursor: 'pointer',
                 border: '1px solid',
                 borderColor: active ? m.color : 'divider',
                 bgcolor: active ? m.bg : 'transparent',
