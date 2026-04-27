@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
@@ -259,11 +258,34 @@ export function AdminTicketsClient() {
   return (
     <Box>
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <Stack direction="row" alignItems="baseline" spacing={1.5} mb={3}>
-        <Typography variant="h5" fontWeight={700}>Issues</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {loading ? '—' : `${tickets.length} total`}
-        </Typography>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
+        <Stack direction="row" alignItems="baseline" spacing={1.5}>
+          <Typography variant="h5" fontWeight={700}>Issues</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {loading ? '—' : `${tickets.length} total`}
+          </Typography>
+        </Stack>
+        <Button
+          size="small" variant="outlined" color="inherit"
+          sx={{ fontSize: 11, color: 'text.secondary', borderColor: 'divider' }}
+          onClick={async () => {
+            const r = await fetch('/api/admin/backfill-ticket-numbers', { method: 'POST' });
+            const d = await r.json();
+            if (r.ok) {
+              alert(`Backfill done: ${d.updated} tickets numbered.`);
+              // Reload tickets
+              setLoading(true);
+              fetch('/api/admin/tickets')
+                .then((res) => res.json())
+                .then((d) => { if (d?.tickets) { setTickets(d.tickets); setUsers(d.users ?? []); } })
+                .finally(() => setLoading(false));
+            } else {
+              alert('Backfill failed: ' + d.error);
+            }
+          }}
+        >
+          Backfill ticket #s
+        </Button>
       </Stack>
 
       {/* ── Status stat pills ──────────────────────────────────────── */}
@@ -299,22 +321,21 @@ export function AdminTicketsClient() {
         )}
       </Stack>
 
-      {/* ── Company tabs + Priority filter ─────────────────────────── */}
+      {/* ── Company dropdown + Priority filter ────────────────────── */}
       <Stack direction="row" alignItems="center" justifyContent="space-between"
         flexWrap="wrap" useFlexGap spacing={1} mb={2}>
-        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-          {(['all', ...companies]).map((c) => (
-            <Chip
-              key={c}
-              label={`${c === 'all' ? 'All' : c} (${companyCounts[c] ?? 0})`}
-              size="small"
-              onClick={() => setCompanyTab(c)}
-              color={companyTab === c ? 'primary' : 'default'}
-              variant={companyTab === c ? 'filled' : 'outlined'}
-              sx={{ fontSize: 12 }}
-            />
+        <TextField
+          select size="small"
+          value={companyTab}
+          onChange={(e) => setCompanyTab(e.target.value)}
+          sx={{ minWidth: 200, fontSize: 13 }}
+          SelectProps={{ displayEmpty: true }}
+        >
+          <MenuItem value="all">All companies ({companyCounts.all ?? 0})</MenuItem>
+          {companies.map((c) => (
+            <MenuItem key={c} value={c}>{c} ({companyCounts[c] ?? 0})</MenuItem>
           ))}
-        </Stack>
+        </TextField>
         <Stack direction="row" spacing={1} alignItems="center">
           {(['', 'high', 'medium', 'low'] as const).map((p) => (
             <Box
@@ -354,13 +375,13 @@ export function AdminTicketsClient() {
           {/* Table head */}
           <Box sx={{
             display: 'grid',
-            gridTemplateColumns: '56px 12px 1fr 100px 130px 120px 60px 28px',
+            gridTemplateColumns: '56px 12px 1fr 140px 100px 130px 120px 60px 28px',
             px: 2, py: 1,
             bgcolor: 'action.hover',
             borderBottom: '1px solid', borderColor: 'divider',
             gap: 1.5,
           }}>
-            {['#', '', 'Issue / Company', 'Type', 'Assignee', 'Status', 'Date', ''].map((h, i) => (
+            {['#', '', 'Issue', 'Company / Project', 'Type', 'Assignee', 'Status', 'Date', ''].map((h, i) => (
               <Typography key={i} variant="caption" fontWeight={700} color="text.secondary"
                 sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {h}
@@ -375,7 +396,7 @@ export function AdminTicketsClient() {
                 onClick={() => setDrawerId(t.id)}
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: '56px 12px 1fr 100px 130px 120px 60px 28px',
+                  gridTemplateColumns: '56px 12px 1fr 140px 100px 130px 120px 60px 28px',
                   px: 2, py: 1.25, gap: 1.5,
                   cursor: 'pointer', alignItems: 'center',
                   '&:hover': { bgcolor: 'action.hover' },
@@ -396,16 +417,28 @@ export function AdminTicketsClient() {
                   }} />
                 </Tooltip>
 
-                {/* Title + company/project */}
+                {/* Title */}
                 <Box sx={{ overflow: 'hidden' }}>
                   <Typography variant="body2" fontWeight={500}
                     sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {t.title}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary"
-                    sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                    {[t.company_name, t.project_name].filter(Boolean).join(' · ') || t.created_by_email}
-                  </Typography>
+                </Box>
+
+                {/* Company / Project */}
+                <Box sx={{ overflow: 'hidden' }}>
+                  {t.company_name && (
+                    <Typography variant="caption" fontWeight={600} color="text.primary"
+                      sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                      {t.company_name}
+                    </Typography>
+                  )}
+                  {t.project_name && (
+                    <Typography variant="caption" color="text.secondary"
+                      sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                      {t.project_name}
+                    </Typography>
+                  )}
                 </Box>
 
                 {/* Type */}

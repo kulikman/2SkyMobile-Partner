@@ -82,14 +82,18 @@ export async function POST(req: NextRequest) {
 
   const adminClient = await createAdminClient();
 
-  // Generate ticket number (count-based, good enough for this scale)
+  // Generate ticket number: MAX(ticket_number) + 1 — no duplicates even after backfill
   let ticketNumber: number | null = null;
   try {
-    const { count } = await adminClient
+    const { data: maxRow } = await adminClient
       .from('documents')
-      .select('*', { count: 'exact', head: true })
-      .eq('doc_type', 'ticket');
-    ticketNumber = (count ?? 0) + 1;
+      .select('metadata')
+      .eq('doc_type', 'ticket')
+      .order('metadata->ticket_number', { ascending: false })
+      .limit(1)
+      .single();
+    const currentMax = (maxRow?.metadata as Record<string, unknown> | null)?.ticket_number;
+    ticketNumber = typeof currentMax === 'number' ? currentMax + 1 : 1;
   } catch { /* best-effort */ }
 
   const { data, error } = await adminClient
