@@ -258,34 +258,11 @@ export function AdminTicketsClient() {
   return (
     <Box>
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
-        <Stack direction="row" alignItems="baseline" spacing={1.5}>
-          <Typography variant="h5" fontWeight={700}>Issues</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {loading ? '—' : `${tickets.length} total`}
-          </Typography>
-        </Stack>
-        <Button
-          size="small" variant="outlined" color="inherit"
-          sx={{ fontSize: 11, color: 'text.secondary', borderColor: 'divider' }}
-          onClick={async () => {
-            const r = await fetch('/api/admin/backfill-ticket-numbers', { method: 'POST' });
-            const d = await r.json();
-            if (r.ok) {
-              alert(`Backfill done: ${d.updated} tickets numbered.`);
-              // Reload tickets
-              setLoading(true);
-              fetch('/api/admin/tickets')
-                .then((res) => res.json())
-                .then((d) => { if (d?.tickets) { setTickets(d.tickets); setUsers(d.users ?? []); } })
-                .finally(() => setLoading(false));
-            } else {
-              alert('Backfill failed: ' + d.error);
-            }
-          }}
-        >
-          Backfill ticket #s
-        </Button>
+      <Stack direction="row" alignItems="baseline" spacing={1.5} mb={3}>
+        <Typography variant="h5" fontWeight={700}>Issues</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {loading ? '—' : `${tickets.length} total`}
+        </Typography>
       </Stack>
 
       {/* ── Status stat pills ──────────────────────────────────────── */}
@@ -454,14 +431,9 @@ export function AdminTicketsClient() {
                     sx={{ fontSize: 11, height: 26, minWidth: 120,
                       '& .MuiSelect-select': { py: 0.25, px: 1, display: 'flex', alignItems: 'center', gap: 0.5 } }}
                     renderValue={(v) => v ? (
-                      <Stack direction="row" spacing={0.5} alignItems="center">
-                        <Avatar sx={{ width: 16, height: 16, fontSize: 10, bgcolor: 'primary.main' }}>
-                          {initials(users.find((u) => u.id === v)?.email ?? '')}
-                        </Avatar>
-                        <Typography sx={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 80 }}>
-                          {users.find((u) => u.id === v)?.email?.split('@')[0] ?? '—'}
-                        </Typography>
-                      </Stack>
+                      <Typography sx={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100 }}>
+                        {users.find((u) => u.id === v)?.email?.split('@')[0] ?? '—'}
+                      </Typography>
                     ) : (
                       <Typography sx={{ fontSize: 11, color: 'text.disabled' }}>Unassigned</Typography>
                     )}
@@ -469,12 +441,7 @@ export function AdminTicketsClient() {
                     <MenuItem value=""><em style={{ fontSize: 11 }}>Unassigned</em></MenuItem>
                     {users.map((u) => (
                       <MenuItem key={u.id} value={u.id} sx={{ fontSize: 11 }}>
-                        <Stack direction="row" spacing={0.75} alignItems="center">
-                          <Avatar sx={{ width: 18, height: 18, fontSize: 10, bgcolor: 'primary.main' }}>
-                            {initials(u.email)}
-                          </Avatar>
-                          {u.email}
-                        </Stack>
+                        {u.email}
                       </MenuItem>
                     ))}
                   </Select>
@@ -649,25 +616,15 @@ export function AdminTicketsClient() {
                   displayEmpty
                   sx={{ fontSize: 13 }}
                   renderValue={(v) => v ? (
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Avatar sx={{ width: 22, height: 22, fontSize: 11, bgcolor: 'primary.main' }}>
-                        {initials(users.find((u) => u.id === v)?.email ?? '')}
-                      </Avatar>
-                      <Typography sx={{ fontSize: 13 }}>
-                        {users.find((u) => u.id === v)?.email ?? '—'}
-                      </Typography>
-                    </Stack>
+                    <Typography sx={{ fontSize: 13 }}>
+                      {users.find((u) => u.id === v)?.email ?? '—'}
+                    </Typography>
                   ) : <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Unassigned</Typography>}
                 >
                   <MenuItem value=""><em>Unassigned</em></MenuItem>
                   {users.map((u) => (
                     <MenuItem key={u.id} value={u.id}>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Avatar sx={{ width: 22, height: 22, fontSize: 11, bgcolor: 'primary.main' }}>
-                          {initials(u.email)}
-                        </Avatar>
-                        {u.email}
-                      </Stack>
+                      {u.email}
                     </MenuItem>
                   ))}
                 </Select>
@@ -683,7 +640,6 @@ export function AdminTicketsClient() {
                     </Box>],
                     ['Severity',  <Typography key="s" variant="body2" sx={{ textTransform: 'capitalize' }}>{drawerTicket.severity}</Typography>],
                     ['Module',    <Typography key="m" variant="body2">{drawerTicket.module ?? '—'}</Typography>],
-                    ['Reporter',  <Typography key="r" variant="body2" sx={{ wordBreak: 'break-all' }}>{drawerTicket.created_by_email || '—'}</Typography>],
                     ['Created',   <Typography key="c" variant="body2">{fmtDate(drawerTicket.created_at)}</Typography>],
                     ['Updated',   <Typography key="u" variant="body2">{fmtDate(drawerTicket.updated_at)}</Typography>],
                   ] as [string, React.ReactNode][]).map(([label, value]) => (
