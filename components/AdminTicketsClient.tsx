@@ -563,7 +563,6 @@ export function AdminTicketsClient() {
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                   {[drawerTicket.company_name, drawerTicket.project_name].filter(Boolean).join(' · ')}
-                  {drawerTicket.created_by_email && ` · ${drawerTicket.created_by_email}`}
                 </Typography>
               </Box>
               <IconButton size="small" onClick={() => setDrawerId(null)} sx={{ flexShrink: 0 }}>

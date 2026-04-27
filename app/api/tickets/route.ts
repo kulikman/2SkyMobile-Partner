@@ -25,6 +25,7 @@ function docToTicket(doc: Record<string, any>, createdByEmail = '') {
     updated_at: m.updated_at ?? doc.created_at,
     created_by_email: createdByEmail,
     parent_id: m.parent_id ?? null,
+    ticket_number: m.ticket_number ?? null,
   };
 }
 
