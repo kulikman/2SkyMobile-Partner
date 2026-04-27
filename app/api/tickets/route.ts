@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { toSlug } from '@/lib/slug';
 import { randomBytes } from 'crypto';
+import { sendTelegramMessage, buildNewTicketMessage } from '@/lib/telegram';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function docToTicket(doc: Record<string, any>, createdByEmail = '') {
@@ -107,6 +108,45 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Notify admins: in-app + Telegram (best-effort, non-blocking)
+  try {
+    const { data: folder } = await adminClient
+      .from('folders').select('slug, company_id').eq('id', folder_id).single();
+
+    let link = `/?issue=${data.id}`;
+    if (folder?.slug && folder.company_id) {
+      const { data: company } = await adminClient
+        .from('companies').select('slug').eq('id', folder.company_id).single();
+      if (company?.slug) {
+        link = `/${company.slug}/${folder.slug}?tab=issues&issue=${data.id}`;
+      }
+    }
+
+    const { data: { users: allUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+    const admins = allUsers.filter((u) => u.user_metadata?.role === 'admin');
+
+    await Promise.all(admins.map((a) =>
+      adminClient.from('notifications').insert({
+        user_id: a.id,
+        type: 'new_ticket',
+        title: `New issue: "${title.trim()}"`,
+        body: description?.trim()?.slice(0, 120) ?? null,
+        link,
+      })
+    ));
+
+    await sendTelegramMessage(buildNewTicketMessage({
+      title: title.trim(),
+      description: description ?? null,
+      priority: priority ?? 'medium',
+      module: module ?? null,
+      type: type ?? null,
+      fromEmail: user.email ?? null,
+      link,
+    }));
+  } catch { /* best-effort — do not fail the request */ }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return NextResponse.json(docToTicket(data as Record<string, any>, user.email ?? ''), { status: 201 });
 }

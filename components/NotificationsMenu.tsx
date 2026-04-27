@@ -34,6 +34,8 @@ const TYPE_COLORS: Record<string, 'default' | 'primary' | 'warning' | 'success' 
   new_report: 'success',
   new_meeting: 'default',
   new_task: 'default',
+  new_ticket: 'error',
+  ticket_status_changed: 'success',
 };
 
 export function NotificationsMenu({ userId }: { userId: string }) {

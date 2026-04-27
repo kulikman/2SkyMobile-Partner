@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -413,6 +414,7 @@ function IssueDrawer({
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: string; isAdmin: boolean; currentUser: CurrentUser }) {
+  const searchParams = useSearchParams();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerTicketId, setDrawerTicketId] = useState<string | null>(null);
@@ -430,6 +432,15 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
   const [submitting,  setSubmitting]  = useState(false);
   const [formError,   setFormError]   = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Open drawer from deep link (?issue=ID) — e.g. from Telegram notification
+  useEffect(() => {
+    const issueId = searchParams.get('issue');
+    if (issueId && tickets.length > 0) {
+      const exists = tickets.some((t) => t.id === issueId);
+      if (exists) setDrawerTicketId(issueId);
+    }
+  }, [searchParams, tickets]);
 
   useEffect(() => {
     fetch(`/api/tickets?folderId=${folderId}`)

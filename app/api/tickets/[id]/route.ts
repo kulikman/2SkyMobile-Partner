@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
+import { sendTelegramMessage, buildStatusChangedMessage } from '@/lib/telegram';
 
 const VALID_STATUSES = ['new', 'in_progress', 'on_hold', 'ready_for_testing', 'approved', 'closed'];
 
@@ -48,7 +49,7 @@ export async function PATCH(
 
   const { data: current, error: fetchError } = await adminClient
     .from('documents')
-    .select('title, description, metadata')
+    .select('id, folder_id, title, description, metadata')
     .eq('id', id)
     .eq('doc_type', 'ticket')
     .single();
@@ -88,6 +89,71 @@ export async function PATCH(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Notify ticket creator on status change (best-effort)
+  const oldStatus = (current.metadata as Record<string, unknown>)?.status as string | undefined;
+  if (status && status !== oldStatus) {
+    try {
+      const creatorId = (current.metadata as Record<string, unknown>)?.created_by as string | undefined;
+      if (creatorId) {
+        // Build link to the issue
+        const { data: folder } = await adminClient
+          .from('folders').select('slug, company_id').eq('id', current.folder_id).single();
+        let link = `/?issue=${id}`;
+        if (folder?.slug && folder.company_id) {
+          const { data: company } = await adminClient
+            .from('companies').select('slug').eq('id', folder.company_id).single();
+          if (company?.slug) {
+            link = `/${company.slug}/${folder.slug}?tab=issues&issue=${id}`;
+          }
+        }
+
+        // In-app notification text per status
+        const STATUS_NOTIF: Record<string, { title: string; body: string }> = {
+          in_progress: {
+            title: `Your issue "${current.title}" is being worked on 🔧`,
+            body: 'Our team has picked up your issue and started working on it.',
+          },
+          on_hold: {
+            title: `Your issue "${current.title}" is on hold ⏸`,
+            body: 'Your issue has been placed on hold temporarily.',
+          },
+          ready_for_testing: {
+            title: `Your issue "${current.title}" is ready for testing 🧪`,
+            body: 'Please test and confirm, then set status to Approved.',
+          },
+          approved: {
+            title: `Your issue "${current.title}" has been approved ✅`,
+            body: 'Your issue has been reviewed and approved.',
+          },
+          closed: {
+            title: `Your issue "${current.title}" has been resolved ✅`,
+            body: 'Your issue has been marked as resolved. Thank you for your report!',
+          },
+        };
+
+        const notif = STATUS_NOTIF[status];
+        if (notif) {
+          await adminClient.from('notifications').insert({
+            user_id: creatorId,
+            type: 'ticket_status_changed',
+            title: notif.title,
+            body: notif.body,
+            link,
+          });
+
+          // Send Telegram message if it's a terminal/major state
+          if (['in_progress', 'closed', 'approved'].includes(status)) {
+            await sendTelegramMessage(buildStatusChangedMessage({
+              title: current.title,
+              newStatus: status,
+              link,
+            }));
+          }
+        }
+      }
+    } catch { /* best-effort */ }
+  }
 
   const m = (data.metadata as Record<string, unknown>) ?? {};
   return NextResponse.json({
