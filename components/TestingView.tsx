@@ -32,6 +32,7 @@ import ChatBubbleIcon from '@mui/icons-material/ChatBubble';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import EditIcon from '@mui/icons-material/Edit';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SendIcon from '@mui/icons-material/Send';
@@ -264,6 +265,99 @@ function AddScenarioDialog({
         <Button onClick={onClose} disabled={saving}>Cancel</Button>
         <Button variant="contained" onClick={handleSubmit} disabled={saving}>
           {saving ? <CircularProgress size={16} color="inherit" /> : 'Add Scenario'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ── Edit Scenario Dialog ──────────────────────────────────────────────────────
+
+function EditScenarioDialog({
+  step,
+  existingModules,
+  onClose,
+  onSaved,
+}: {
+  step: CustomStep | null;
+  existingModules: string[];
+  onClose: () => void;
+  onSaved: (step: CustomStep) => void;
+}) {
+  const allModules = Array.from(new Set([...STATIC_MODULES, ...existingModules]));
+  const [moduleVal, setModuleVal] = useState('');
+  const [scenario, setScenario] = useState('');
+  const [type, setType] = useState<'Automated' | 'Manual'>('Manual');
+  const [validates, setValidates] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (step) {
+      setModuleVal(step.module);
+      setScenario(step.scenario);
+      setType(step.type);
+      setValidates(step.validates);
+      setErr('');
+    }
+  }, [step]);
+
+  async function handleSubmit() {
+    if (!moduleVal.trim() || !scenario.trim()) { setErr('Module and Scenario are required'); return; }
+    setSaving(true);
+    setErr('');
+    try {
+      const res = await fetch('/api/testing/steps', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: step!.id, module: moduleVal.trim(), scenario: scenario.trim(), type, validates: validates.trim() }),
+      });
+      if (!res.ok) { const d = await res.json(); setErr(d.error ?? 'Error'); return; }
+      const data: CustomStep = await res.json();
+      onSaved(data);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={Boolean(step)} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontWeight: 700 }}>Edit Scenario</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2.5} sx={{ mt: 1 }}>
+          {err && <Typography color="error" variant="caption">{err}</Typography>}
+
+          <Box>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>Module *</Typography>
+            <Select value={moduleVal} onChange={(e) => setModuleVal(e.target.value)} size="small" fullWidth>
+              {allModules.map((m) => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+            </Select>
+          </Box>
+
+          <Box>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>Scenario *</Typography>
+            <TextField size="small" fullWidth multiline minRows={2} value={scenario} onChange={(e) => setScenario(e.target.value)} />
+          </Box>
+
+          <Box>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>Type</Typography>
+            <Select value={type} onChange={(e) => setType(e.target.value as 'Automated' | 'Manual')} size="small" fullWidth>
+              <MenuItem value="Manual">Manual</MenuItem>
+              <MenuItem value="Automated">Automated</MenuItem>
+            </Select>
+          </Box>
+
+          <Box>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>Validates (acceptance criteria)</Typography>
+            <TextField size="small" fullWidth multiline minRows={2} value={validates} onChange={(e) => setValidates(e.target.value)} />
+          </Box>
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button variant="contained" onClick={handleSubmit} disabled={saving}>
+          {saving ? <CircularProgress size={16} color="inherit" /> : 'Save'}
         </Button>
       </DialogActions>
     </Dialog>
@@ -651,6 +745,7 @@ export function TestingView({
   const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
 
   const [addScenarioOpen, setAddScenarioOpen] = useState(false);
+  const [editStep, setEditStep] = useState<CustomStep | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -934,16 +1029,40 @@ export function TestingView({
                           </Select>
                         </TableCell>
                         <TableCell sx={{ py: 1 }} onClick={(e) => e.stopPropagation()}>
-                          <IconButton
-                            size="small"
-                            onClick={() => setDrawerStepId(stepId)}
-                            sx={{ color: hasComments ? '#1976d2' : 'text.disabled' }}
-                          >
-                            {hasComments
-                              ? <ChatBubbleIcon sx={{ fontSize: 16 }} />
-                              : <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
-                            }
-                          </IconButton>
+                          <Stack direction="row" spacing={0.25} justifyContent="flex-end">
+                            <IconButton
+                              size="small"
+                              onClick={() => setDrawerStepId(stepId)}
+                              sx={{ color: hasComments ? '#1976d2' : 'text.disabled' }}
+                            >
+                              {hasComments
+                                ? <ChatBubbleIcon sx={{ fontSize: 16 }} />
+                                : <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
+                              }
+                            </IconButton>
+                            {isAdmin && (
+                              <Tooltip title="Edit scenario">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setEditStep(cs)}
+                                  sx={{ color: 'text.secondary' }}
+                                >
+                                  <EditIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                            {isAdmin && (
+                              <Tooltip title="Delete scenario">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => deleteCustomStep(cs.id)}
+                                  sx={{ color: 'error.main' }}
+                                >
+                                  <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Stack>
                         </TableCell>
                       </TableRow>
                     );
@@ -996,6 +1115,17 @@ export function TestingView({
         existingModules={customModules}
         onClose={() => setAddScenarioOpen(false)}
         onCreated={(step) => setCustomSteps((prev) => [...prev, step])}
+      />
+
+      {/* Edit Scenario dialog */}
+      <EditScenarioDialog
+        step={editStep}
+        existingModules={customModules}
+        onClose={() => setEditStep(null)}
+        onSaved={(updated) => {
+          setCustomSteps((prev) => prev.map((s) => s.id === updated.id ? updated : s));
+          setEditStep(null);
+        }}
       />
     </Box>
   );

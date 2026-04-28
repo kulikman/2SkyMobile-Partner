@@ -54,6 +54,33 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(data, { status: 201 });
 }
 
+export async function PATCH(req: NextRequest) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (user.user_metadata?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any;
+  try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
+
+  const { id, module: mod, scenario, type, validates } = body;
+  if (!id || !mod?.trim() || !scenario?.trim() || !type) {
+    return NextResponse.json({ error: 'id, module, scenario and type required' }, { status: 400 });
+  }
+
+  const adminClient = await createAdminClient();
+  const { data, error } = await adminClient
+    .from('testing_custom_steps')
+    .update({ module: mod.trim(), scenario: scenario.trim(), type, validates: validates?.trim() ?? '' })
+    .eq('id', id)
+    .select('id, module, scenario, type, validates, created_at')
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
+}
+
 export async function DELETE(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

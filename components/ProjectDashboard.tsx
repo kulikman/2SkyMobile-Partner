@@ -19,7 +19,6 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import BusinessIcon from '@mui/icons-material/Business';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -127,7 +126,6 @@ function CompanySection({
 }) {
   const accent = company.color ?? '#1976d2';
   const initials = company.name.slice(0, 2).toUpperCase();
-  const spaceHref = company.slug ? `/${company.slug}` : null;
   const activeCount = projects.filter((p) =>
     ['in_progress', 'in_discussion', 'on_hold'].includes(p.status)
   ).length;
@@ -171,17 +169,6 @@ function CompanySection({
           </Stack>
         </Box>
 
-        {spaceHref && (
-          <Button
-            component={Link}
-            href={spaceHref}
-            size="small"
-            endIcon={<ArrowForwardIcon sx={{ fontSize: 14 }} />}
-            sx={{ color: 'text.secondary', fontSize: 12, textTransform: 'none', flexShrink: 0 }}
-          >
-            Space
-          </Button>
-        )}
       </Stack>
 
       <Box sx={{
