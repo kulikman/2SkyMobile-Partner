@@ -216,10 +216,10 @@ export function ProjectDetail({
           variant="outlined"
           sx={[
             {
-              mb: 2,
-              px: 3,
-              py: 2,
-              borderRadius: 3,
+              mb: 1.5,
+              px: 2,
+              py: 1,
+              borderRadius: 2,
               borderColor: 'primary.main',
               display: 'flex',
               alignItems: 'center',
@@ -234,26 +234,23 @@ export function ProjectDetail({
             }),
           ]}
         >
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <RocketLaunchIcon color="primary" />
-            <Box>
-              <Typography variant="subtitle2" fontWeight={700}>
-                Test environment is ready
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Open the link and go through the scenarios from the Tasks tab
-              </Typography>
-            </Box>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <RocketLaunchIcon color="primary" sx={{ fontSize: 18 }} />
+            <Typography variant="body2" fontWeight={700}>Test environment is ready</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+              — open the link and go through the scenarios from the Tasks tab
+            </Typography>
           </Stack>
           <Button
             variant="contained"
+            size="small"
             href={project.stage_url}
             target="_blank"
             rel="noopener noreferrer"
-            endIcon={<OpenInNewIcon fontSize="small" />}
+            endIcon={<OpenInNewIcon sx={{ fontSize: '14px !important' }} />}
             sx={{ flexShrink: 0 }}
           >
-            Open test environment
+            Open
           </Button>
         </Paper>
       )}
@@ -265,9 +262,9 @@ export function ProjectDetail({
           sx={[
             {
               mb: 4,
-              px: 3,
-              py: 2,
-              borderRadius: 3,
+              px: 2,
+              py: 1,
+              borderRadius: 2,
               borderColor: 'divider',
             },
             (theme) => ({
@@ -277,56 +274,43 @@ export function ProjectDetail({
             }),
           ]}
         >
-          <Stack direction="row" alignItems="center" justifyContent="space-between" mb={testLinks.length > 0 ? 1.5 : 0}>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <LinkIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-              <Box>
-                <Typography variant="subtitle2" fontWeight={700}>
-                  Useful links
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Quick access to project-related resources
-                </Typography>
-              </Box>
-            </Stack>
+          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" gap={1}>
+            <LinkIcon sx={{ color: 'text.secondary', fontSize: 16, flexShrink: 0 }} />
+            <Typography variant="body2" fontWeight={700} sx={{ flexShrink: 0 }}>
+              Useful links
+            </Typography>
+
+            {testLinks.length > 0 && (
+              <Stack direction="row" flexWrap="wrap" gap={0.75} alignItems="center">
+                {testLinks.map((link, i) => (
+                  <Button
+                    key={i}
+                    variant="outlined"
+                    size="small"
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    endIcon={<OpenInNewIcon sx={{ fontSize: '12px !important' }} />}
+                    sx={{ borderRadius: 5, textTransform: 'none', fontSize: 12, py: 0.25, px: 1.25 }}
+                  >
+                    {link.label}
+                  </Button>
+                ))}
+              </Stack>
+            )}
+
+            {testLinks.length === 0 && isAdmin && (
+              <Typography variant="caption" color="text.disabled">No links yet</Typography>
+            )}
+
             {isAdmin && (
               <Tooltip title="Manage links">
-                <IconButton size="small" onClick={openLinks}>
-                  <EditIcon fontSize="small" />
+                <IconButton size="small" onClick={openLinks} sx={{ ml: 'auto' }}>
+                  <EditIcon sx={{ fontSize: 15 }} />
                 </IconButton>
               </Tooltip>
             )}
           </Stack>
-
-          {testLinks.length === 0 && isAdmin && (
-            <Button
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={openLinks}
-              sx={{ mt: 0.5 }}
-            >
-              Add links
-            </Button>
-          )}
-
-          {testLinks.length > 0 && (
-            <Stack direction="row" flexWrap="wrap" gap={1}>
-              {testLinks.map((link, i) => (
-                <Button
-                  key={i}
-                  variant="outlined"
-                  size="small"
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  endIcon={<OpenInNewIcon sx={{ fontSize: '13px !important' }} />}
-                  sx={{ borderRadius: 5, textTransform: 'none', fontSize: 13 }}
-                >
-                  {link.label}
-                </Button>
-              ))}
-            </Stack>
-          )}
         </Paper>
       )}
 
