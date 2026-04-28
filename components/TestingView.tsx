@@ -746,21 +746,35 @@ export function TestingView({
 
   const [addScenarioOpen, setAddScenarioOpen] = useState(false);
   const [editStep, setEditStep] = useState<CustomStep | null>(null);
+  const [hiddenStepIds, setHiddenStepIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     Promise.all([
       fetch(`/api/testing/results?folderId=${folderId}`).then((r) => r.json()),
       fetch(`/api/testing/comments?folderId=${folderId}`).then((r) => r.json()),
       fetch(`/api/testing/steps?folderId=${folderId}`).then((r) => r.json()),
-    ]).then(([r, c, s]) => {
+      fetch(`/api/testing/hidden?folderId=${folderId}`).then((r) => r.json()),
+    ]).then(([r, c, s, h]) => {
       const map = new Map<string, Result>();
       if (Array.isArray(r)) r.forEach((item: Result) => map.set(item.step_id, item));
       setResults(map);
       setComments(Array.isArray(c) ? c : []);
       setCustomSteps(Array.isArray(s) ? s : []);
+      setHiddenStepIds(new Set(Array.isArray(h) ? h : []));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [folderId]);
+
+  async function hideStaticStep(stepId: string) {
+    if (!window.confirm('Hide this scenario? You can restore it later.')) return;
+    await fetch('/api/testing/hidden', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderId, stepId }),
+    });
+    setHiddenStepIds((prev) => new Set(prev).add(stepId));
+    if (drawerStepId === stepId) setDrawerStepId(null);
+  }
 
   function toggleModule(mod: string) {
     setCollapsedModules((prev) => {
@@ -874,7 +888,10 @@ export function TestingView({
                 const staticSteps = STEPS.filter((s) => s.module === mod);
                 const modCustomSteps = customSteps.filter((s) => s.module === mod);
                 const isCollapsed = collapsedModules.has(mod);
-                const allModSteps = [...staticSteps.map((s) => s.id), ...modCustomSteps.map((s) => `custom-${s.id}`)];
+                const allModSteps = [
+                  ...staticSteps.filter((s) => !hiddenStepIds.has(s.id)).map((s) => s.id),
+                  ...modCustomSteps.map((s) => `custom-${s.id}`),
+                ];
                 const modPassed = allModSteps.filter((id) => results.get(id)?.status === 'pass').length;
 
                 return [
@@ -908,7 +925,9 @@ export function TestingView({
                   </TableRow>,
 
                   /* Static step rows */
-                  ...(!isCollapsed ? staticSteps.map((step) => {
+                  ...(!isCollapsed ? staticSteps
+                    .filter((step) => !hiddenStepIds.has(step.id))
+                    .map((step) => {
                     const result = results.get(step.id);
                     const sm = STATUS_META[result?.status ?? 'pending'];
                     const stepComments = comments.filter((c) => c.step_id === step.id);
@@ -959,16 +978,30 @@ export function TestingView({
                           </Select>
                         </TableCell>
                         <TableCell sx={{ py: 1 }} onClick={(e) => e.stopPropagation()}>
-                          <IconButton
-                            size="small"
-                            onClick={() => setDrawerStepId(step.id)}
-                            sx={{ color: hasComments ? '#1976d2' : 'text.disabled' }}
-                          >
-                            {hasComments
-                              ? <ChatBubbleIcon sx={{ fontSize: 16 }} />
-                              : <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
-                            }
-                          </IconButton>
+                          <Stack direction="row" spacing={0.25} justifyContent="flex-end">
+                            <Tooltip title="Open details">
+                              <IconButton size="small" onClick={() => setDrawerStepId(step.id)} sx={{ color: '#1976d2' }}>
+                                <EditIcon sx={{ fontSize: 16 }} />
+                              </IconButton>
+                            </Tooltip>
+                            {isAdmin && (
+                              <Tooltip title="Hide scenario">
+                                <IconButton size="small" onClick={() => hideStaticStep(step.id)} sx={{ color: '#1976d2' }}>
+                                  <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                            <IconButton
+                              size="small"
+                              onClick={() => setDrawerStepId(step.id)}
+                              sx={{ color: hasComments ? '#1976d2' : 'text.disabled' }}
+                            >
+                              {hasComments
+                                ? <ChatBubbleIcon sx={{ fontSize: 16 }} />
+                                : <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
+                              }
+                            </IconButton>
+                          </Stack>
                         </TableCell>
                       </TableRow>
                     );
