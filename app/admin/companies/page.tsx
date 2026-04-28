@@ -17,7 +17,7 @@ export default async function AdminCompaniesPage() {
     .select('*')
     .order('created_at', { ascending: false });
 
-  // Paginate to get ALL users (not just first 1000)
+  // Fetch ALL users (for the "Add existing user" autocomplete)
   const allAuthUsers: { id: string; email: string; role: string }[] = [];
   let page = 1;
   while (true) {
@@ -35,17 +35,18 @@ export default async function AdminCompaniesPage() {
     page = nextPage;
   }
 
+  // Use a direct SQL JOIN (auth.users ⟶ company_members) via SECURITY DEFINER function.
+  // This is reliable and doesn't depend on listUsers pagination.
   const { data: rawMemberships } = await adminClient
-    .from('company_members')
-    .select('id, company_id, user_id');
+    .rpc('get_company_members_with_email');
 
-  // Enrich memberships with email server-side to avoid client-side join failures
-  const userMap = new Map(allAuthUsers.map((u) => [u.id, u]));
-  const memberships = (rawMemberships ?? []).map((m) => ({
-    id: m.id as string,
-    company_id: m.company_id as string,
-    user_id: m.user_id as string,
-    email: userMap.get(m.user_id as string)?.email ?? null,
+  const memberships = (rawMemberships ?? []).map((m: {
+    id: string; company_id: string; user_id: string; email: string | null; role: string;
+  }) => ({
+    id: m.id,
+    company_id: m.company_id,
+    user_id: m.user_id,
+    email: m.email,
   }));
 
   return (
