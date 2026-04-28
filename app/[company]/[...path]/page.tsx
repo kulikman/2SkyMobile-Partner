@@ -162,6 +162,7 @@ export default async function SpacePathPage({
       started_at: f.started_at ?? null,
       deadline_at: f.deadline_at ?? null,
       stage_url: f.stage_url ?? null,
+      test_links: Array.isArray(f.test_links) ? f.test_links : [],
     };
 
     const companies = (rawCompanies ?? []).map((c) => ({ id: c.id as string, name: c.name as string }));

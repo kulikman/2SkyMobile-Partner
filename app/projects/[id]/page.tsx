@@ -60,6 +60,7 @@ export default async function ProjectPage({
     started_at: folder.started_at ?? null,
     deadline_at: folder.deadline_at ?? null,
     stage_url: (f.stage_url as string) ?? null,
+    test_links: Array.isArray(f.test_links) ? (f.test_links as { label: string; url: string }[]) : [],
   };
   const { data: rawCompanies } = await adminClient
     .from('companies')

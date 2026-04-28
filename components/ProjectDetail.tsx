@@ -15,11 +15,17 @@ import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import LinkIcon from '@mui/icons-material/Link';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import { ProjectChat } from './ProjectChat';
+
+export type TestLink = { label: string; url: string };
 
 export type ProjectData = {
   id: string;
@@ -33,6 +39,7 @@ export type ProjectData = {
   started_at: string | null;
   deadline_at: string | null;
   stage_url: string | null;
+  test_links?: TestLink[];
 };
 
 type Company = { id: string; name: string };
@@ -74,6 +81,13 @@ export function ProjectDetail({
   const [editStageUrl, setEditStageUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState('');
+
+  // Test links state
+  const [linksOpen, setLinksOpen] = useState(false);
+  const [draftLinks, setDraftLinks] = useState<TestLink[]>([]);
+  const [newLabel, setNewLabel] = useState('');
+  const [newUrl, setNewUrl] = useState('');
+  const [linksSaving, setLinksSaving] = useState(false);
 
   function openEdit() {
     setEditName(project.name);
@@ -120,10 +134,46 @@ export function ProjectDetail({
     router.refresh();
   }
 
+  function openLinks() {
+    setDraftLinks(project.test_links ?? []);
+    setNewLabel('');
+    setNewUrl('');
+    setLinksOpen(true);
+  }
+
+  function addDraftLink() {
+    if (!newLabel.trim() || !newUrl.trim()) return;
+    const url = newUrl.trim().startsWith('http') ? newUrl.trim() : `https://${newUrl.trim()}`;
+    setDraftLinks((prev) => [...prev, { label: newLabel.trim(), url }]);
+    setNewLabel('');
+    setNewUrl('');
+  }
+
+  function removeDraftLink(idx: number) {
+    setDraftLinks((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  async function saveLinks() {
+    setLinksSaving(true);
+    const res = await fetch(`/api/folders/${project.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ test_links: draftLinks }),
+    });
+    if (res.ok) {
+      setProject((prev) => ({ ...prev, test_links: draftLinks }));
+      setLinksOpen(false);
+    }
+    setLinksSaving(false);
+  }
+
+  const testLinks = project.test_links ?? [];
+  const hasStageOrLinks = project.stage_url || testLinks.length > 0;
+
   return (
     <Box>
       {/* Header */}
-      <Stack spacing={1} mb={project.stage_url ? 3 : 4}>
+      <Stack spacing={1} mb={hasStageOrLinks ? 3 : 4}>
         <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
           <Typography variant="h4" fontWeight={800}>{project.name}</Typography>
           <Chip
@@ -160,13 +210,13 @@ export function ProjectDetail({
         )}
       </Stack>
 
-      {/* Test environment banner — visible to everyone when set */}
+      {/* Test environment banner */}
       {project.stage_url && (
         <Paper
           variant="outlined"
           sx={[
             {
-              mb: 3,
+              mb: 2,
               px: 3,
               py: 2,
               borderRadius: 3,
@@ -208,10 +258,82 @@ export function ProjectDetail({
         </Paper>
       )}
 
+      {/* Test links block */}
+      {(testLinks.length > 0 || isAdmin) && (
+        <Paper
+          variant="outlined"
+          sx={[
+            {
+              mb: 4,
+              px: 3,
+              py: 2,
+              borderRadius: 3,
+              borderColor: 'divider',
+            },
+            (theme) => ({
+              bgcolor: theme.palette.mode === 'dark'
+                ? 'rgba(255,255,255,0.03)'
+                : 'rgba(0,0,0,0.02)',
+            }),
+          ]}
+        >
+          <Stack direction="row" alignItems="center" justifyContent="space-between" mb={testLinks.length > 0 ? 1.5 : 0}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <LinkIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+              <Box>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  Useful links
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Quick access to project-related resources
+                </Typography>
+              </Box>
+            </Stack>
+            {isAdmin && (
+              <Tooltip title="Manage links">
+                <IconButton size="small" onClick={openLinks}>
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Stack>
+
+          {testLinks.length === 0 && isAdmin && (
+            <Button
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={openLinks}
+              sx={{ mt: 0.5 }}
+            >
+              Add links
+            </Button>
+          )}
+
+          {testLinks.length > 0 && (
+            <Stack direction="row" flexWrap="wrap" gap={1}>
+              {testLinks.map((link, i) => (
+                <Button
+                  key={i}
+                  variant="outlined"
+                  size="small"
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  endIcon={<OpenInNewIcon sx={{ fontSize: '13px !important' }} />}
+                  sx={{ borderRadius: 5, textTransform: 'none', fontSize: 13 }}
+                >
+                  {link.label}
+                </Button>
+              ))}
+            </Stack>
+          )}
+        </Paper>
+      )}
+
       {/* Chat FAB */}
       <ProjectChat folderId={project.id} currentUser={currentUser} />
 
-      {/* Edit dialog */}
+      {/* Edit project dialog */}
       <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle fontWeight={700}>Edit project</DialogTitle>
         <DialogContent>
@@ -287,6 +409,71 @@ export function ProjectDetail({
             startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
           >
             {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Manage links dialog */}
+      <Dialog open={linksOpen} onClose={() => setLinksOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle fontWeight={700}>Manage useful links</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {draftLinks.length > 0 && (
+              <Stack spacing={1}>
+                {draftLinks.map((link, i) => (
+                  <Stack key={i} direction="row" spacing={1} alignItems="center">
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" fontWeight={600} noWrap>{link.label}</Typography>
+                      <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                        {link.url}
+                      </Typography>
+                    </Box>
+                    <IconButton size="small" color="error" onClick={() => removeDraftLink(i)}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
+
+            <Stack direction="row" spacing={1} alignItems="flex-start">
+              <TextField
+                label="Label"
+                placeholder="Figma design"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                size="small"
+                sx={{ flex: 1 }}
+              />
+              <TextField
+                label="URL"
+                placeholder="https://..."
+                value={newUrl}
+                onChange={(e) => setNewUrl(e.target.value)}
+                size="small"
+                sx={{ flex: 2 }}
+                onKeyDown={(e) => { if (e.key === 'Enter') addDraftLink(); }}
+              />
+              <IconButton
+                onClick={addDraftLink}
+                disabled={!newLabel.trim() || !newUrl.trim()}
+                color="primary"
+                sx={{ mt: 0.5 }}
+              >
+                <AddIcon />
+              </IconButton>
+            </Stack>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={() => setLinksOpen(false)} disabled={linksSaving}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={saveLinks}
+            disabled={linksSaving}
+            startIcon={linksSaving ? <CircularProgress size={16} color="inherit" /> : undefined}
+          >
+            {linksSaving ? 'Saving…' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>
