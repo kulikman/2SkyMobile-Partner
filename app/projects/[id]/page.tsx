@@ -11,7 +11,6 @@ import { ProjectDetail } from '@/components/ProjectDetail';
 import { ProjectTabs } from '@/components/ProjectTabs';
 import { getDisplayName } from '@/lib/user-display';
 import type { ProjectData } from '@/components/ProjectDetail';
-import type { ReportDoc } from '@/components/ReportList';
 
 export default async function ProjectPage({
   params,
@@ -69,28 +68,9 @@ export default async function ProjectPage({
 
   const companies = (rawCompanies ?? []).map((c) => ({ id: c.id as string, name: c.name as string }));
 
-  // Company for breadcrumb
   const folderCompany = folder.company_id
     ? (rawCompanies ?? []).find((c) => c.id === folder.company_id) ?? null
     : null;
-
-  const { data: rawDocs } = await supabase
-    .from('documents')
-    .select('id, slug, title, description, report_type, report_period_start, report_period_end, created_at')
-    .eq('folder_id', id)
-    .eq('doc_type', 'md')
-    .order('created_at', { ascending: false });
-
-  const reports: ReportDoc[] = (rawDocs ?? []).map((d: Record<string, unknown>) => ({
-    id: d.id as string,
-    slug: d.slug as string,
-    title: d.title as string,
-    description: (d.description as string) ?? null,
-    report_type: (d.report_type as string) ?? null,
-    report_period_start: (d.report_period_start as string) ?? null,
-    report_period_end: (d.report_period_end as string) ?? null,
-    created_at: d.created_at as string,
-  }));
 
   const currentUser = {
     id: user.id,
@@ -119,7 +99,6 @@ export default async function ProjectPage({
           <Typography color="text.primary" fontWeight={600}>{project.name}</Typography>
         </Breadcrumbs>
 
-        {/* Project header */}
         <ProjectDetail
           project={project}
           companies={companies}
@@ -127,10 +106,8 @@ export default async function ProjectPage({
           isAdmin={isAdmin}
         />
 
-        {/* Tabbed sections */}
         <ProjectTabs
           folderId={id}
-          reports={reports}
           initialSpec={f.tech_spec as Record<string, string> | null ?? null}
           isAdmin={isAdmin}
           currentUser={currentUser}

@@ -30,7 +30,6 @@ import { splitDocumentContent } from '@/lib/document-content';
 import { ProjectDetail } from '@/components/ProjectDetail';
 import { ProjectTabs } from '@/components/ProjectTabs';
 import type { ProjectData } from '@/components/ProjectDetail';
-import type { ReportDoc } from '@/components/ReportList';
 
 const RESERVED = new Set([
   'login', 'admin', 'projects', 'docs', 'share', 'blueprint',
@@ -38,11 +37,10 @@ const RESERVED = new Set([
 ]);
 
 const TAB_NAME_TO_INDEX: Record<string, number> = {
-  reports: 0, techstack: 1, 'tech-stack': 1,
-  documentation: 2, docs: 2,
-  meetings: 3,
-  testing: 4,
-  issues: 5,
+  docs: 0, reports: 0,
+  techstack: 1, 'tech-stack': 1,
+  testing: 2,
+  issues: 3,
 };
 
 export default async function SpacePathPage({
@@ -142,14 +140,9 @@ export default async function SpacePathPage({
     const [
       { data: folderData },
       { data: rawCompanies },
-      { data: rawDocs },
     ] = await Promise.all([
       adminClient.from('folders').select('*').eq('id', resolved.folderId).single(),
       adminClient.from('companies').select('id, name, slug').order('name', { ascending: true }),
-      adminClient.from('documents')
-        .select('id, slug, title, description, report_type, report_period_start, report_period_end, created_at')
-        .eq('folder_id', resolved.folderId).eq('doc_type', 'md')
-        .order('created_at', { ascending: false }),
     ]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -170,17 +163,6 @@ export default async function SpacePathPage({
     };
 
     const companies = (rawCompanies ?? []).map((c) => ({ id: c.id as string, name: c.name as string }));
-
-    const reports: ReportDoc[] = (rawDocs ?? []).map((d: Record<string, unknown>) => ({
-      id: d.id as string,
-      slug: d.slug as string,
-      title: d.title as string,
-      description: (d.description as string) ?? null,
-      report_type: (d.report_type as string) ?? null,
-      report_period_start: (d.report_period_start as string) ?? null,
-      report_period_end: (d.report_period_end as string) ?? null,
-      created_at: d.created_at as string,
-    }));
 
     const currentUser = {
       id: user.id,
@@ -206,7 +188,6 @@ export default async function SpacePathPage({
 
           <ProjectTabs
             folderId={resolved.folderId}
-            reports={reports}
             initialSpec={f.tech_spec as Record<string, string> | null ?? null}
             isAdmin={isAdmin}
             currentUser={currentUser}

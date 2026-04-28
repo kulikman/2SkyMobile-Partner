@@ -6,21 +6,17 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
-import { MeetingsView } from './MeetingsView';
-import { ProjectFilesView } from './ProjectFilesView';
+import { DocsView } from './DocsView';
 import { TechStackEditor } from './TechStackEditor';
-import { ReportList } from './ReportList';
 import { IssuesView } from './IssuesView';
 import { TestingView } from './TestingView';
-import type { ReportDoc } from './ReportList';
 
 type CurrentUser = { id: string; email: string; name: string };
 
-// Tab order: Reports(0) Tech Stack(1) Documentation(2) Meetings(3) Testing(4) Issues(5)
+// Tab order: Docs(0) Tech Stack(1) Testing(2) Issues(3)
 
 export function ProjectTabs({
   folderId,
-  reports,
   initialSpec,
   isAdmin,
   currentUser,
@@ -28,7 +24,6 @@ export function ProjectTabs({
   initialTab = 0,
 }: {
   folderId: string;
-  reports: ReportDoc[];
   initialSpec: Record<string, string> | null;
   isAdmin: boolean;
   currentUser: CurrentUser;
@@ -46,18 +41,16 @@ export function ProjectTabs({
         scrollButtons="auto"
         sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
       >
-        <Tab label="Reports" />
+        <Tab label="Docs" />
         <Tab label="Tech Stack" />
-        <Tab label="Documentation" />
-        <Tab label="Meetings" />
         <Tab label="Testing" />
         <Tab label="Issues" />
       </Tabs>
 
-      {/* 0 — Reports */}
+      {/* 0 — Docs */}
       <Box sx={{ display: tab === 0 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
-          <ReportList reports={reports} folderId={folderId} isAdmin={isAdmin} canonicalBase={canonicalBase} />
+          <DocsView folderId={folderId} isAdmin={isAdmin} canonicalBase={canonicalBase} />
         </Paper>
       </Box>
 
@@ -68,29 +61,15 @@ export function ProjectTabs({
         </Paper>
       </Box>
 
-      {/* 2 — Documentation */}
+      {/* 2 — Testing */}
       <Box sx={{ display: tab === 2 ? 'block' : 'none' }}>
-        <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
-          <ProjectFilesView folderId={folderId} isAdmin={isAdmin} />
-        </Paper>
-      </Box>
-
-      {/* 3 — Meetings */}
-      <Box sx={{ display: tab === 3 ? 'block' : 'none' }}>
-        <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
-          <MeetingsView folderId={folderId} isAdmin={isAdmin} />
-        </Paper>
-      </Box>
-
-      {/* 4 — Testing */}
-      <Box sx={{ display: tab === 4 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
           <TestingView folderId={folderId} currentUser={currentUser} isAdmin={isAdmin} />
         </Paper>
       </Box>
 
-      {/* 5 — Issues */}
-      <Box sx={{ display: tab === 5 ? 'block' : 'none' }}>
+      {/* 3 — Issues */}
+      <Box sx={{ display: tab === 3 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
           <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress size={28} /></Box>}>
             <IssuesView folderId={folderId} isAdmin={isAdmin} currentUser={currentUser} />
