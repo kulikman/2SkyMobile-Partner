@@ -267,25 +267,34 @@ export function DocsView({
               <Typography variant="overline" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
                 Documents
               </Typography>
-              <Stack spacing={0.5}>
+              {/* Header row */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 130px 80px', px: 1.5, pb: 0.5 }}>
+                <Typography variant="caption" color="text.disabled" fontWeight={600}>Name</Typography>
+                <Typography variant="caption" color="text.disabled" fontWeight={600}>Category</Typography>
+                <Typography variant="caption" color="text.disabled" fontWeight={600}>Actions</Typography>
+              </Box>
+              <Stack spacing={0}>
                 {documents.map((doc) => (
-                  <Stack
+                  <Box
                     key={doc.id}
-                    direction="row"
-                    alignItems="center"
-                    justifyContent="space-between"
                     sx={{
-                      px: 1.5, py: 1, borderRadius: 1.5,
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 130px 80px',
+                      alignItems: 'center',
+                      px: 1.5, py: 0.75,
+                      borderRadius: 1.5,
                       cursor: 'pointer',
                       '&:hover': { bgcolor: 'action.hover' },
                     }}
                     onClick={() => { if (canonicalBase) window.location.href = docHref(doc); }}
                   >
-                    <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
                       {docTypeIcon(doc.doc_type)}
-                      <Typography variant="body2" fontWeight={500}>{doc.title}</Typography>
-                      <Chip label={docTypeLabel(doc.doc_type)} size="small" variant="outlined" sx={{ fontSize: 11, height: 20 }} />
+                      <Typography variant="body2" fontWeight={500} noWrap>{doc.title}</Typography>
                     </Stack>
+                    <Box>
+                      <Chip label={docTypeLabel(doc.doc_type)} size="small" variant="outlined" sx={{ fontSize: 11, height: 20 }} />
+                    </Box>
                     <Stack direction="row" spacing={0.5} alignItems="center" onClick={(e) => e.stopPropagation()}>
                       {(doc.doc_type === 'md' || doc.doc_type === 'report') && (
                         <Tooltip title="Download .md">
@@ -304,7 +313,7 @@ export function DocsView({
                         </IconButton>
                       )}
                     </Stack>
-                  </Stack>
+                  </Box>
                 ))}
               </Stack>
             </Box>

@@ -13,8 +13,8 @@ export const metadata: Metadata = {
   title: 'Partner Dev 2SkyMobile',
   description: '2SkyMobile Partner Development Portal',
   icons: {
-    icon: '/logo.svg',
-    shortcut: '/logo.svg',
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
   },
 };
 

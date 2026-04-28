@@ -8,6 +8,7 @@ import CardActionArea from '@mui/material/CardActionArea';
 import CardContent from '@mui/material/CardContent';
 import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
 import FolderIcon from '@mui/icons-material/Folder';
 import DescriptionIcon from '@mui/icons-material/Description';
 import EditIcon from '@mui/icons-material/Edit';
@@ -29,6 +30,7 @@ import { getDisplayName } from '@/lib/user-display';
 import { splitDocumentContent } from '@/lib/document-content';
 import { ProjectDetail } from '@/components/ProjectDetail';
 import { ProjectTabs } from '@/components/ProjectTabs';
+import { CopyLinkButton } from '@/components/CopyLinkButton';
 import type { ProjectData } from '@/components/ProjectDetail';
 
 const RESERVED = new Set([
@@ -357,13 +359,16 @@ export default async function SpacePathPage({
             gap: 2, mb: 4, mt: 2, flexDirection: { xs: 'column', sm: 'row' },
           }}>
             <Typography variant="h4" fontWeight={700}>{doc.title}</Typography>
-            {editHref && (
-              <Link href={editHref} style={{ textDecoration: 'none' }}>
-                <Button variant="outlined" size="small" startIcon={<EditIcon fontSize="small" />}>
-                  Edit
-                </Button>
-              </Link>
-            )}
+            <Stack direction="row" spacing={1}>
+              <CopyLinkButton />
+              {editHref && (
+                <Link href={editHref} style={{ textDecoration: 'none' }}>
+                  <Button variant="outlined" size="small" startIcon={<EditIcon fontSize="small" />}>
+                    Edit
+                  </Button>
+                </Link>
+              )}
+            </Stack>
           </Box>
 
           {doc.description && (
