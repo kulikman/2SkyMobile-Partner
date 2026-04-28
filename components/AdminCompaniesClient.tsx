@@ -50,6 +50,7 @@ type CompanyMember = {
   id: string;
   company_id: string;
   user_id: string;
+  email: string | null;
 };
 
 function generatePassword(len = 14): string {
@@ -109,10 +110,16 @@ export function AdminCompaniesClient({
   const [deleteTarget, setDeleteTarget] = useState<Company | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  function getMembers(companyId: string) {
+  function getMembers(companyId: string): UserInfo[] {
     return memberships
       .filter((m) => m.company_id === companyId)
-      .map((m) => localUsers.find((u) => u.id === m.user_id))
+      .map((m) => {
+        // Prefer user from local state (may have fresh data); fall back to email on membership
+        const found = localUsers.find((u) => u.id === m.user_id);
+        if (found) return found;
+        if (m.email) return { id: m.user_id, email: m.email, role: 'viewer' };
+        return null;
+      })
       .filter(Boolean) as UserInfo[];
   }
 
@@ -193,7 +200,8 @@ export function AdminCompaniesClient({
     });
     if (res.ok) {
       const data = await res.json();
-      setMemberships((prev) => [...prev, { id: data.id, company_id: data.company_id, user_id: data.user_id }]);
+      const userEmail = localUsers.find((u) => u.id === userId)?.email ?? null;
+      setMemberships((prev) => [...prev, { id: data.id, company_id: data.company_id, user_id: data.user_id, email: userEmail }]);
       setSelectedUser(null);
     }
   }
@@ -215,7 +223,7 @@ export function AdminCompaniesClient({
     if (!res.ok) { setNewPartnerError(data.error ?? 'Error'); return; }
     const newUser: UserInfo = { id: data.user_id, email: newPartnerEmail.trim(), role: 'viewer' };
     setLocalUsers((prev) => [...prev, newUser]);
-    setMemberships((prev) => [...prev, { id: data.id, company_id: data.company_id, user_id: data.user_id }]);
+    setMemberships((prev) => [...prev, { id: data.id, company_id: data.company_id, user_id: data.user_id, email: newPartnerEmail.trim() }]);
     setNewPartnerEmail('');
     setNewPartnerPassword('');
   }

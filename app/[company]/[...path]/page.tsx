@@ -74,10 +74,45 @@ export default async function SpacePathPage({
     const adminClient = await createAdminClient();
     const { data: doc } = await adminClient
       .from('documents')
-      .select('id, title, slug, content, doc_type, description, image, public_access_enabled, public_comments_visible, anonymous_comments_enabled')
+      .select('id, title, slug, content, doc_type, description, image, public_access_enabled, public_comments_visible, anonymous_comments_enabled, folder_id')
       .eq('id', resolved.documentId)
       .single();
     if (!doc) notFound();
+
+    // Build folder picker options: current folder + its siblings + its sub-folders
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const docFolderId = (doc as any).folder_id as string | null;
+    const folderOptions: { id: string; name: string; indent?: boolean }[] = [];
+    if (docFolderId) {
+      const { data: curFolder } = await adminClient
+        .from('folders').select('id, name, parent_id').eq('id', docFolderId).single();
+      if (curFolder) {
+        const [{ data: subFolders }, { data: siblings }] = await Promise.all([
+          adminClient.from('folders').select('id, name').eq('parent_id', docFolderId).order('name'),
+          curFolder.parent_id
+            ? adminClient.from('folders').select('id, name').eq('parent_id', curFolder.parent_id).order('name')
+            : Promise.resolve({ data: [] }),
+        ]);
+        // Parent folder (move up)
+        if (curFolder.parent_id) {
+          const { data: parentFolder } = await adminClient
+            .from('folders').select('id, name').eq('id', curFolder.parent_id).single();
+          if (parentFolder) folderOptions.push({ id: parentFolder.id, name: `↑ ${parentFolder.name}` });
+        }
+        // Siblings at same level (incl. current)
+        for (const f of siblings ?? []) {
+          folderOptions.push({ id: f.id, name: f.name });
+        }
+        // If no parent (root-level folder), add itself
+        if (!curFolder.parent_id) {
+          folderOptions.push({ id: curFolder.id, name: curFolder.name });
+        }
+        // Sub-folders of current folder (indented)
+        for (const f of subFolders ?? []) {
+          folderOptions.push({ id: f.id, name: f.name, indent: true });
+        }
+      }
+    }
 
     const backHref = `/${companySlug}/${docPath.join('/')}`;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -119,6 +154,8 @@ export default async function SpacePathPage({
             initialPublicAccessEnabled={Boolean(doc.public_access_enabled)}
             initialPublicCommentsVisible={Boolean(doc.public_comments_visible)}
             initialAnonymousCommentsEnabled={Boolean(doc.anonymous_comments_enabled)}
+            initialFolderId={docFolderId ?? undefined}
+            folderOptions={folderOptions}
           />
         </Container>
       </Box>

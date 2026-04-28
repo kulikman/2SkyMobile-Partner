@@ -31,6 +31,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import FolderIcon from '@mui/icons-material/Folder';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 
 type DocType = 'md' | 'whiteboard' | 'report';
 
@@ -82,6 +83,8 @@ export function DocsView({
   const [newDocTitle, setNewDocTitle] = useState('');
   const [newDocType, setNewDocType] = useState<DocType>('md');
   const [newDocSaving, setNewDocSaving] = useState(false);
+  const [newDocFileContent, setNewDocFileContent] = useState<string | null>(null);
+  const [newDocFileName, setNewDocFileName] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<{ kind: 'folder' | 'document'; id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -137,19 +140,44 @@ export function DocsView({
     setNewFolderSaving(false);
   }
 
+  function handleNewDocFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === 'string' ? reader.result : '';
+      setNewDocFileContent(text);
+      setNewDocFileName(file.name);
+      // Auto-fill title from filename if not already set
+      if (!newDocTitle.trim()) {
+        const baseName = file.name.replace(/\.(md|txt|markdown)$/i, '').replace(/[-_]/g, ' ');
+        setNewDocTitle(baseName.charAt(0).toUpperCase() + baseName.slice(1));
+      }
+    };
+    reader.readAsText(file);
+  }
+
   async function createDocument() {
     if (!newDocTitle.trim()) return;
     setNewDocSaving(true);
     const res = await fetch('/api/docs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newDocTitle.trim(), doc_type: newDocType, folder_id: currentFolderId }),
+      body: JSON.stringify({
+        title: newDocTitle.trim(),
+        doc_type: newDocType,
+        folder_id: currentFolderId,
+        content: newDocFileContent ?? '',
+      }),
     });
     if (res.ok) {
       const doc = await res.json();
       setNewDocOpen(false);
       setNewDocTitle('');
       setNewDocType('md');
+      setNewDocFileContent(null);
+      setNewDocFileName(null);
       if (canonicalBase) {
         const slugParts = path.slice(1).map((p) => p.slug).filter(Boolean) as string[];
         window.location.href = [canonicalBase, ...slugParts, doc.slug, 'edit'].join('/');
@@ -368,7 +396,7 @@ export function DocsView({
       </Dialog>
 
       {/* New Document Dialog */}
-      <Dialog open={newDocOpen} onClose={() => setNewDocOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog open={newDocOpen} onClose={() => { setNewDocOpen(false); setNewDocFileContent(null); setNewDocFileName(null); }} maxWidth="xs" fullWidth>
         <DialogTitle fontWeight={700}>New document</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
@@ -390,10 +418,35 @@ export function DocsView({
               <MenuItem value="whiteboard">Whiteboard</MenuItem>
               <MenuItem value="report">Report</MenuItem>
             </TextField>
+            {/* File upload */}
+            {newDocType !== 'whiteboard' && (
+              <Box>
+                <Button
+                  component="label"
+                  variant="outlined"
+                  size="small"
+                  startIcon={<UploadFileIcon />}
+                  sx={{ textTransform: 'none' }}
+                >
+                  {newDocFileName ? `File: ${newDocFileName}` : 'Import from file (.md / .txt)'}
+                  <input
+                    hidden
+                    type="file"
+                    accept=".md,.txt,.markdown"
+                    onChange={handleNewDocFile}
+                  />
+                </Button>
+                {newDocFileName && (
+                  <Button size="small" color="inherit" sx={{ ml: 1 }} onClick={() => { setNewDocFileContent(null); setNewDocFileName(null); }}>
+                    Clear
+                  </Button>
+                )}
+              </Box>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setNewDocOpen(false)}>Cancel</Button>
+          <Button onClick={() => { setNewDocOpen(false); setNewDocFileContent(null); setNewDocFileName(null); }}>Cancel</Button>
           <Button variant="contained" disabled={newDocSaving || !newDocTitle.trim()} onClick={createDocument}>
             {newDocSaving ? 'Creating…' : 'Create'}
           </Button>

@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
-  const { title, doc_type = 'md', folder_id } = body;
+  const { title, doc_type = 'md', folder_id, content = '' } = body;
   if (!title || !folder_id) return NextResponse.json({ error: 'title and folder_id required' }, { status: 400 });
 
   const adminClient = await createAdminClient();
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await adminClient
     .from('documents')
-    .insert({ title, slug, doc_type, folder_id, content: '', position: 0 })
+    .insert({ title, slug, doc_type, folder_id, content, position: 0 })
     .select('id, slug, title, doc_type, created_at')
     .single();
 

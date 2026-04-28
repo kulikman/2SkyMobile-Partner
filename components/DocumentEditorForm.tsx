@@ -6,6 +6,7 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
+import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Stack from '@mui/material/Stack';
@@ -19,6 +20,8 @@ import { DocumentMetaPopover } from './DocumentMetaPopover';
 
 const MAX_IMAGE_UPLOAD_BYTES = 2 * 1024 * 1024;
 
+type FolderOption = { id: string; name: string; indent?: boolean };
+
 export function DocumentEditorForm({
   mode,
   initialTitle = '',
@@ -30,6 +33,8 @@ export function DocumentEditorForm({
   initialPublicCommentsVisible = false,
   initialAnonymousCommentsEnabled = false,
   documentId,
+  initialFolderId,
+  folderOptions = [],
 }: {
   mode: 'create' | 'edit';
   initialTitle?: string;
@@ -41,6 +46,8 @@ export function DocumentEditorForm({
   initialPublicCommentsVisible?: boolean;
   initialAnonymousCommentsEnabled?: boolean;
   documentId?: string;
+  initialFolderId?: string;
+  folderOptions?: FolderOption[];
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
@@ -54,6 +61,7 @@ export function DocumentEditorForm({
   const [publicAccessEnabled, setPublicAccessEnabled] = useState(initialPublicAccessEnabled);
   const [publicCommentsVisible, setPublicCommentsVisible] = useState(initialPublicCommentsVisible);
   const [anonymousCommentsEnabled, setAnonymousCommentsEnabled] = useState(initialAnonymousCommentsEnabled);
+  const [folderId, setFolderId] = useState(initialFolderId ?? '');
   const [slugTouched, setSlugTouched] = useState(
     mode === 'edit' ? initialSlug !== slugify(initialTitle) : false
   );
@@ -129,6 +137,7 @@ export function DocumentEditorForm({
         publicAccessEnabled,
         publicCommentsVisible,
         anonymousCommentsEnabled,
+        ...(mode === 'edit' && folderId ? { folderId } : {}),
       }),
     });
 
@@ -173,6 +182,22 @@ export function DocumentEditorForm({
               }}
               helperText={`URL: /docs/${slug || '...'}`}
             />
+            {mode === 'edit' && folderOptions.length > 0 && (
+              <TextField
+                label="Folder"
+                select
+                fullWidth
+                value={folderId}
+                onChange={(e) => setFolderId(e.target.value)}
+                helperText="Move document to a different folder"
+              >
+                {folderOptions.map((f) => (
+                  <MenuItem key={f.id} value={f.id}>
+                    {f.indent ? `   ↳ ${f.name}` : f.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
             <TextField
               label="Description"
               fullWidth
