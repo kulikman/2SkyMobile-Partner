@@ -35,19 +35,29 @@ export default async function AdminCompaniesPage() {
     page = nextPage;
   }
 
-  // Use a direct SQL JOIN (auth.users ⟶ company_members) via SECURITY DEFINER function.
-  // This is reliable and doesn't depend on listUsers pagination.
-  const { data: rawMemberships } = await adminClient
+  // Try SECURITY DEFINER function first (direct SQL JOIN — most reliable).
+  // Falls back to direct table query + listUsers join if function not yet created.
+  let memberships: { id: string; company_id: string; user_id: string; email: string | null }[] = [];
+
+  const { data: rpcData, error: rpcError } = await adminClient
     .rpc('get_company_members_with_email');
 
-  const memberships = (rawMemberships ?? []).map((m: {
-    id: string; company_id: string; user_id: string; email: string | null; role: string;
-  }) => ({
-    id: m.id,
-    company_id: m.company_id,
-    user_id: m.user_id,
-    email: m.email,
-  }));
+  if (!rpcError && rpcData) {
+    memberships = (rpcData as { id: string; company_id: string; user_id: string; email: string | null }[])
+      .map((m) => ({ id: m.id, company_id: m.company_id, user_id: m.user_id, email: m.email }));
+  } else {
+    // Fallback: query company_members directly and enrich with listUsers data
+    const { data: rawMemberships } = await adminClient
+      .from('company_members')
+      .select('id, company_id, user_id');
+    const userMap = new Map(allAuthUsers.map((u) => [u.id, u]));
+    memberships = (rawMemberships ?? []).map((m) => ({
+      id: m.id as string,
+      company_id: m.company_id as string,
+      user_id: m.user_id as string,
+      email: userMap.get(m.user_id as string)?.email ?? null,
+    }));
+  }
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
