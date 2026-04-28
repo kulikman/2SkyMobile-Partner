@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       .order('name', { ascending: true }),
     adminClient
       .from('documents')
-      .select('id, slug, title, doc_type, created_at, content')
+      .select('id, slug, title, doc_type, report_type, created_at, content')
       .eq('folder_id', folderId)
       .not('doc_type', 'in', '(ticket,task,meeting)')
       .order('created_at', { ascending: false }),

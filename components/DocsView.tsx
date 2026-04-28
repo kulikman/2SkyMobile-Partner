@@ -35,7 +35,7 @@ import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 type DocType = 'md' | 'whiteboard' | 'report';
 
 type DocFolder = { id: string; name: string; slug: string | null; icon: string | null; color: string | null };
-type DocItem = { id: string; slug: string; title: string; doc_type: string; created_at: string; content: string };
+type DocItem = { id: string; slug: string; title: string; doc_type: string; report_type: string | null; created_at: string; content: string };
 
 type BreadcrumbEntry = { id: string; slug: string | null; name: string };
 
@@ -184,6 +184,9 @@ export function DocsView({
     URL.revokeObjectURL(url);
   }
 
+  const reportDocs = documents.filter((d) => d.doc_type === 'report' || d.report_type);
+  const otherDocs  = documents.filter((d) => d.doc_type !== 'report' && !d.report_type);
+
   const isEmpty = !loading && folders.length === 0 && documents.length === 0;
   const totalRows = folders.length + documents.length;
 
@@ -283,49 +286,59 @@ export function DocsView({
                   </TableRow>
                 ))}
 
-                {/* Document rows */}
-                {documents.map((doc) => (
-                  <TableRow
-                    key={`d-${doc.id}`}
-                    hover
-                    sx={{ cursor: 'pointer' }}
-                    onClick={() => { if (canonicalBase) window.location.href = docHref(doc); }}
-                  >
-                    <TableCell sx={{ py: 1 }}>
-                      <Box sx={{ display: 'flex' }}>{docTypeIcon(doc.doc_type)}</Box>
-                    </TableCell>
-                    <TableCell sx={{ py: 1 }}>
-                      <Typography variant="body2" fontWeight={500} noWrap>{doc.title}</Typography>
-                    </TableCell>
-                    <TableCell sx={{ py: 1 }}>
-                      <Chip
-                        label={docTypeLabel(doc.doc_type)}
-                        size="small"
-                        variant="outlined"
-                        color={typeChipColor[doc.doc_type] ?? 'default'}
-                        sx={{ fontSize: 11, height: 20 }}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ py: 0.5 }} align="right" onClick={(e) => e.stopPropagation()}>
-                      <Stack direction="row" spacing={0.25} justifyContent="flex-end">
-                        {(doc.doc_type === 'md' || doc.doc_type === 'report') && (
-                          <Tooltip title="Download .md">
-                            <IconButton size="small" onClick={() => downloadMd(doc)}>
-                              <DownloadIcon sx={{ fontSize: 16 }} />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        {isAdmin && (
-                          <Tooltip title="Delete document">
-                            <IconButton size="small" color="error" onClick={() => setDeleteTarget({ kind: 'document', id: doc.id, name: doc.title })}>
-                              <DeleteIcon sx={{ fontSize: 16 }} />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {/* Reports group */}
+                {reportDocs.length > 0 && (
+                  <>
+                    <TableRow>
+                      <TableCell
+                        colSpan={4}
+                        sx={(theme) => ({
+                          py: 0.75, px: 2,
+                          bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                          borderBottom: '1px solid',
+                          borderColor: 'divider',
+                        })}
+                      >
+                        <Stack direction="row" spacing={0.75} alignItems="center">
+                          <AssessmentIcon sx={{ fontSize: 14, color: 'secondary.main' }} />
+                          <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            Reports
+                          </Typography>
+                          <Typography variant="caption" color="text.disabled">({reportDocs.length})</Typography>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                    {reportDocs.map((doc) => <DocRow key={`r-${doc.id}`} doc={doc} isAdmin={isAdmin} docHref={docHref} downloadMd={downloadMd} setDeleteTarget={setDeleteTarget} />)}
+                  </>
+                )}
+
+                {/* Documents group */}
+                {otherDocs.length > 0 && (
+                  <>
+                    {(folders.length > 0 || reportDocs.length > 0) && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          sx={(theme) => ({
+                            py: 0.75, px: 2,
+                            bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                            borderBottom: '1px solid',
+                            borderColor: 'divider',
+                          })}
+                        >
+                          <Stack direction="row" spacing={0.75} alignItems="center">
+                            <ArticleIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                              Documents
+                            </Typography>
+                            <Typography variant="caption" color="text.disabled">({otherDocs.length})</Typography>
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {otherDocs.map((doc) => <DocRow key={`d-${doc.id}`} doc={doc} isAdmin={isAdmin} docHref={docHref} downloadMd={downloadMd} setDeleteTarget={setDeleteTarget} />)}
+                  </>
+                )}
               </TableBody>
             </Table>
           </TableContainer>
@@ -404,5 +417,57 @@ export function DocsView({
         </DialogActions>
       </Dialog>
     </Box>
+  );
+}
+
+function DocRow({
+  doc, isAdmin, docHref, downloadMd, setDeleteTarget,
+}: {
+  doc: DocItem;
+  isAdmin: boolean;
+  docHref: (doc: DocItem) => string;
+  downloadMd: (doc: DocItem) => void;
+  setDeleteTarget: (t: { kind: 'folder' | 'document'; id: string; name: string }) => void;
+}) {
+  return (
+    <TableRow
+      hover
+      sx={{ cursor: 'pointer' }}
+      onClick={() => { const href = docHref(doc); if (href !== '#') window.location.href = href; }}
+    >
+      <TableCell sx={{ py: 1 }}>
+        <Box sx={{ display: 'flex' }}>{docTypeIcon(doc.doc_type)}</Box>
+      </TableCell>
+      <TableCell sx={{ py: 1 }}>
+        <Typography variant="body2" fontWeight={500} noWrap>{doc.title}</Typography>
+      </TableCell>
+      <TableCell sx={{ py: 1 }}>
+        <Chip
+          label={docTypeLabel(doc.doc_type)}
+          size="small"
+          variant="outlined"
+          color={typeChipColor[doc.doc_type] ?? 'default'}
+          sx={{ fontSize: 11, height: 20 }}
+        />
+      </TableCell>
+      <TableCell sx={{ py: 0.5 }} align="right" onClick={(e) => e.stopPropagation()}>
+        <Stack direction="row" spacing={0.25} justifyContent="flex-end">
+          {(doc.doc_type === 'md' || doc.doc_type === 'report') && (
+            <Tooltip title="Download .md">
+              <IconButton size="small" onClick={() => downloadMd(doc)}>
+                <DownloadIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          {isAdmin && (
+            <Tooltip title="Delete document">
+              <IconButton size="small" color="error" onClick={() => setDeleteTarget({ kind: 'document', id: doc.id, name: doc.title })}>
+                <DeleteIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Stack>
+      </TableCell>
+    </TableRow>
   );
 }
