@@ -9,22 +9,28 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
+import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import ArticleIcon from '@mui/icons-material/Article';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import FolderIcon from '@mui/icons-material/Folder';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import AssessmentIcon from '@mui/icons-material/Assessment';
 
 type DocType = 'md' | 'whiteboard' | 'report';
 
@@ -32,6 +38,8 @@ type DocFolder = { id: string; name: string; slug: string | null; icon: string |
 type DocItem = { id: string; slug: string; title: string; doc_type: string; created_at: string; content: string };
 
 type BreadcrumbEntry = { id: string; slug: string | null; name: string };
+
+const cellSx = { py: 1.25, fontWeight: 700, fontSize: 12, borderBottom: '1px solid', borderColor: 'divider' };
 
 function docTypeIcon(doc_type: string) {
   if (doc_type === 'whiteboard') return <DashboardIcon fontSize="small" sx={{ color: 'primary.main' }} />;
@@ -44,6 +52,12 @@ function docTypeLabel(doc_type: string) {
   if (doc_type === 'report') return 'Report';
   return 'Document';
 }
+
+const typeChipColor: Record<string, 'default' | 'primary' | 'secondary'> = {
+  whiteboard: 'primary',
+  report: 'secondary',
+  md: 'default',
+};
 
 export function DocsView({
   folderId,
@@ -136,10 +150,7 @@ export function DocsView({
       setNewDocOpen(false);
       setNewDocTitle('');
       setNewDocType('md');
-      if (newDocType === 'whiteboard' && canonicalBase) {
-        const slugParts = path.slice(1).map((p) => p.slug).filter(Boolean) as string[];
-        window.location.href = [canonicalBase, ...slugParts, doc.slug, 'edit'].join('/');
-      } else if (canonicalBase) {
+      if (canonicalBase) {
         const slugParts = path.slice(1).map((p) => p.slug).filter(Boolean) as string[];
         window.location.href = [canonicalBase, ...slugParts, doc.slug, 'edit'].join('/');
       } else {
@@ -174,34 +185,41 @@ export function DocsView({
   }
 
   const isEmpty = !loading && folders.length === 0 && documents.length === 0;
+  const totalRows = folders.length + documents.length;
 
   return (
     <Box>
-      {/* Breadcrumbs */}
-      <Stack direction="row" alignItems="center" spacing={0.5} mb={2} flexWrap="wrap">
-        {path.map((entry, idx) => (
-          <Stack key={idx} direction="row" alignItems="center" spacing={0.5}>
-            {idx > 0 && <ChevronRightIcon sx={{ fontSize: 16, color: 'text.disabled' }} />}
-            {idx < path.length - 1 ? (
-              <Typography
-                variant="body2"
-                color="primary"
-                sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-                onClick={() => navigateTo(idx)}
-              >
-                {entry.name}
-              </Typography>
-            ) : (
-              <Stack direction="row" alignItems="center" spacing={0.5}>
-                <FolderOpenIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                <Typography variant="body2" fontWeight={600}>{entry.name}</Typography>
-              </Stack>
-            )}
-          </Stack>
-        ))}
+      {/* Top bar: breadcrumbs + action buttons */}
+      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2} flexWrap="wrap" gap={1}>
+        {/* Breadcrumbs */}
+        <Stack direction="row" alignItems="center" spacing={0.5} flexWrap="wrap">
+          {path.map((entry, idx) => (
+            <Stack key={idx} direction="row" alignItems="center" spacing={0.5}>
+              {idx > 0 && <ChevronRightIcon sx={{ fontSize: 16, color: 'text.disabled' }} />}
+              {idx < path.length - 1 ? (
+                <Typography
+                  variant="body2"
+                  color="primary"
+                  sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                  onClick={() => navigateTo(idx)}
+                >
+                  {entry.name}
+                </Typography>
+              ) : (
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  <FolderOpenIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
+                  <Typography variant="body2" fontWeight={600} color="text.primary">{entry.name}</Typography>
+                  {totalRows > 0 && (
+                    <Typography variant="caption" color="text.disabled">({totalRows})</Typography>
+                  )}
+                </Stack>
+              )}
+            </Stack>
+          ))}
+        </Stack>
 
         {isAdmin && (
-          <Stack direction="row" spacing={1} sx={{ ml: 'auto' }}>
+          <Stack direction="row" spacing={1}>
             <Button size="small" startIcon={<AddIcon />} onClick={() => setNewFolderOpen(true)}>
               Folder
             </Button>
@@ -212,120 +230,107 @@ export function DocsView({
         )}
       </Stack>
 
-      <Divider sx={{ mb: 2 }} />
-
-      {loading && (
-        <Box sx={{ py: 6, textAlign: 'center' }}>
-          <CircularProgress size={28} />
-        </Box>
-      )}
-
-      {!loading && (
-        <>
-          {/* Folders */}
-          {folders.length > 0 && (
-            <Box mb={3}>
-              <Typography variant="overline" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                Folders
-              </Typography>
-              <Stack spacing={0.5}>
+      {/* Table */}
+      <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+        {loading ? (
+          <Box sx={{ py: 6, textAlign: 'center' }}>
+            <CircularProgress size={28} />
+          </Box>
+        ) : isEmpty ? (
+          <Box sx={{ py: 6, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              {isAdmin ? 'No files yet. Create a folder or document to get started.' : 'No files yet.'}
+            </Typography>
+          </Box>
+        ) : (
+          <TableContainer>
+            <Table size="small" sx={{ tableLayout: 'fixed' }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ ...cellSx, width: 36 }} />
+                  <TableCell sx={cellSx}>Name</TableCell>
+                  <TableCell sx={{ ...cellSx, width: 130 }}>Category</TableCell>
+                  <TableCell sx={{ ...cellSx, width: 90 }} align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {/* Folder rows */}
                 {folders.map((folder) => (
-                  <Stack
-                    key={folder.id}
-                    direction="row"
-                    alignItems="center"
-                    justifyContent="space-between"
-                    sx={{
-                      px: 1.5, py: 1, borderRadius: 1.5,
-                      cursor: 'pointer',
-                      '&:hover': { bgcolor: 'action.hover' },
-                    }}
+                  <TableRow
+                    key={`f-${folder.id}`}
+                    hover
+                    sx={{ cursor: 'pointer' }}
                     onClick={() => navigateInto(folder)}
                   >
-                    <Stack direction="row" spacing={1.5} alignItems="center">
-                      <FolderIcon sx={{ color: folder.color ?? 'text.secondary', fontSize: 20 }} />
-                      <Typography variant="body2" fontWeight={500}>{folder.name}</Typography>
-                    </Stack>
-                    {isAdmin && (
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={(e) => { e.stopPropagation(); setDeleteTarget({ kind: 'folder', id: folder.id, name: folder.name }); }}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    )}
-                  </Stack>
-                ))}
-              </Stack>
-            </Box>
-          )}
-
-          {/* Documents */}
-          {documents.length > 0 && (
-            <Box>
-              <Typography variant="overline" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                Documents
-              </Typography>
-              {/* Header row */}
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 130px 80px', px: 1.5, pb: 0.5 }}>
-                <Typography variant="caption" color="text.disabled" fontWeight={600}>Name</Typography>
-                <Typography variant="caption" color="text.disabled" fontWeight={600}>Category</Typography>
-                <Typography variant="caption" color="text.disabled" fontWeight={600}>Actions</Typography>
-              </Box>
-              <Stack spacing={0}>
-                {documents.map((doc) => (
-                  <Box
-                    key={doc.id}
-                    sx={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 130px 80px',
-                      alignItems: 'center',
-                      px: 1.5, py: 0.75,
-                      borderRadius: 1.5,
-                      cursor: 'pointer',
-                      '&:hover': { bgcolor: 'action.hover' },
-                    }}
-                    onClick={() => { if (canonicalBase) window.location.href = docHref(doc); }}
-                  >
-                    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
-                      {docTypeIcon(doc.doc_type)}
-                      <Typography variant="body2" fontWeight={500} noWrap>{doc.title}</Typography>
-                    </Stack>
-                    <Box>
-                      <Chip label={docTypeLabel(doc.doc_type)} size="small" variant="outlined" sx={{ fontSize: 11, height: 20 }} />
-                    </Box>
-                    <Stack direction="row" spacing={0.5} alignItems="center" onClick={(e) => e.stopPropagation()}>
-                      {(doc.doc_type === 'md' || doc.doc_type === 'report') && (
-                        <Tooltip title="Download .md">
-                          <IconButton size="small" onClick={() => downloadMd(doc)}>
-                            <DownloadIcon fontSize="small" />
+                    <TableCell sx={{ py: 1 }}>
+                      <FolderIcon sx={{ fontSize: 18, color: folder.color ?? 'text.secondary', display: 'block' }} />
+                    </TableCell>
+                    <TableCell sx={{ py: 1 }}>
+                      <Typography variant="body2" fontWeight={500} noWrap>{folder.name}</Typography>
+                    </TableCell>
+                    <TableCell sx={{ py: 1 }}>
+                      <Chip label="Folder" size="small" variant="outlined" sx={{ fontSize: 11, height: 20, color: 'text.secondary', borderColor: 'divider' }} />
+                    </TableCell>
+                    <TableCell sx={{ py: 0.5 }} align="right" onClick={(e) => e.stopPropagation()}>
+                      {isAdmin && (
+                        <Tooltip title="Delete folder">
+                          <IconButton size="small" color="error" onClick={() => setDeleteTarget({ kind: 'folder', id: folder.id, name: folder.name })}>
+                            <DeleteIcon sx={{ fontSize: 16 }} />
                           </IconButton>
                         </Tooltip>
                       )}
-                      {isAdmin && (
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => setDeleteTarget({ kind: 'document', id: doc.id, name: doc.title })}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      )}
-                    </Stack>
-                  </Box>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </Stack>
-            </Box>
-          )}
 
-          {isEmpty && (
-            <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-              {isAdmin ? 'No files yet. Create a folder or document to get started.' : 'No files yet.'}
-            </Typography>
-          )}
-        </>
-      )}
+                {/* Document rows */}
+                {documents.map((doc) => (
+                  <TableRow
+                    key={`d-${doc.id}`}
+                    hover
+                    sx={{ cursor: 'pointer' }}
+                    onClick={() => { if (canonicalBase) window.location.href = docHref(doc); }}
+                  >
+                    <TableCell sx={{ py: 1 }}>
+                      <Box sx={{ display: 'flex' }}>{docTypeIcon(doc.doc_type)}</Box>
+                    </TableCell>
+                    <TableCell sx={{ py: 1 }}>
+                      <Typography variant="body2" fontWeight={500} noWrap>{doc.title}</Typography>
+                    </TableCell>
+                    <TableCell sx={{ py: 1 }}>
+                      <Chip
+                        label={docTypeLabel(doc.doc_type)}
+                        size="small"
+                        variant="outlined"
+                        color={typeChipColor[doc.doc_type] ?? 'default'}
+                        sx={{ fontSize: 11, height: 20 }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ py: 0.5 }} align="right" onClick={(e) => e.stopPropagation()}>
+                      <Stack direction="row" spacing={0.25} justifyContent="flex-end">
+                        {(doc.doc_type === 'md' || doc.doc_type === 'report') && (
+                          <Tooltip title="Download .md">
+                            <IconButton size="small" onClick={() => downloadMd(doc)}>
+                              <DownloadIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {isAdmin && (
+                          <Tooltip title="Delete document">
+                            <IconButton size="small" color="error" onClick={() => setDeleteTarget({ kind: 'document', id: doc.id, name: doc.title })}>
+                              <DeleteIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
 
       {/* New Folder Dialog */}
       <Dialog open={newFolderOpen} onClose={() => setNewFolderOpen(false)} maxWidth="xs" fullWidth>
