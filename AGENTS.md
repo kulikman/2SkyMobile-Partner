@@ -38,6 +38,12 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - The base schema file is not the whole model anymore; current app code also depends on later columns/tables such as `doc_type`, folder share tokens, `project_members`, `roadmap_items`, `chat_messages`, and report metadata.
 - Access rules rely heavily on Supabase RLS. Before changing folder/project queries, check the `project_members` migration because non-admin users only see assigned folders/projects.
 
+## Git Workflow
+
+- **Never push automatically after committing.** Only commit; never run `git push` unless the user explicitly says "пуш" or "push".
+- When multiple commits accumulate before a push, squash them into one commit first (`git rebase -i`), then push.
+- Always run `npm run lint && npm run build` before committing to catch errors early.
+
 ## UI Quirks
 
 - Theme setup is split between `app/layout.tsx` and `components/ThemeRegistry.tsx`. Preserve `InitColorSchemeScript`, the cookie-backed storage manager, and the shared `THEME_MODE_COOKIE` flow or you will reintroduce hydration/theme flicker.
