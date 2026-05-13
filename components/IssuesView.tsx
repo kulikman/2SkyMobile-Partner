@@ -482,10 +482,11 @@ export function IssuesView({
   const [loading, setLoading] = useState(true);
   const [drawerTicketId, setDrawerTicketId] = useState<string | null>(null);
 
-  // Compact filters
-  const [filterSearch, setFilterSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterType,   setFilterType]   = useState('');
+  // Filters
+  const [filterSearch,   setFilterSearch]   = useState('');
+  const [filterStatus,   setFilterStatus]   = useState('');
+  const [filterType,     setFilterType]     = useState('');
+  const [filterPriority, setFilterPriority] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [ticketComments, setTicketComments] = useState<Map<string, TicketComment[]>>(new Map());
   const [sendingComment, setSendingComment] = useState<Set<string>>(new Set());
@@ -722,14 +723,15 @@ export function IssuesView({
   // ── Data ──────────────────────────────────────────────────────────────────
 
   const displayTickets = useMemo(() => tickets.filter((t) => {
-    if (filterStatus && t.status !== filterStatus) return false;
-    if (filterType   && t.type   !== filterType)   return false;
+    if (filterStatus   && t.status   !== filterStatus)   return false;
+    if (filterType     && t.type     !== filterType)     return false;
+    if (filterPriority && t.priority !== filterPriority) return false;
     if (filterSearch) {
       const q = filterSearch.toLowerCase();
       if (!t.title.toLowerCase().includes(q) && !String(t.ticket_number ?? '').includes(q)) return false;
     }
     return true;
-  }), [tickets, filterStatus, filterType, filterSearch]);
+  }), [tickets, filterStatus, filterType, filterPriority, filterSearch]);
 
   const groups = PRIORITIES.map((p) => ({
     priority: p,
@@ -853,22 +855,62 @@ export function IssuesView({
         </Button>
       </Stack>
 
-      {/* Compact filter bar */}
+      {/* Filter bar */}
       {tickets.length > 0 && (
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}
           flexWrap="wrap" useFlexGap mb={2}>
+
+          {/* Search */}
           <TextField
             size="small"
             placeholder="Search…"
             value={filterSearch}
             onChange={(e) => setFilterSearch(e.target.value)}
-            sx={{ width: 180, '& .MuiInputBase-input': { fontSize: 12 } }}
+            sx={{ width: 160, '& .MuiInputBase-input': { fontSize: 12 } }}
             inputProps={{ 'aria-label': 'Search issues' }}
           />
+
+          {/* Priority pills */}
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            {([
+              { value: '', label: 'All' },
+              { value: 'high',   label: 'High',   color: '#ef4444' },
+              { value: 'medium', label: 'Medium', color: '#f59e0b' },
+              { value: 'low',    label: 'Low',    color: '#22c55e' },
+            ] as { value: string; label: string; color?: string }[]).map((p) => {
+              const active = filterPriority === p.value;
+              return (
+                <Box
+                  key={p.value || 'all'}
+                  onClick={() => setFilterPriority((prev) => prev === p.value ? '' : p.value)}
+                  sx={{
+                    display: 'flex', alignItems: 'center', gap: 0.5,
+                    px: 1.25, py: 0.4, borderRadius: '6px', cursor: 'pointer',
+                    border: '1px solid',
+                    borderColor: active ? 'primary.main' : 'divider',
+                    bgcolor: active ? 'primary.50' : 'transparent',
+                    transition: 'all .12s',
+                    '&:hover': { borderColor: p.color ?? 'primary.main' },
+                  }}
+                >
+                  {p.color && (
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: p.color, flexShrink: 0 }} />
+                  )}
+                  <Typography sx={{ fontSize: 12, fontWeight: active ? 700 : 500, color: active ? 'primary.main' : 'text.secondary', lineHeight: 1 }}>
+                    {p.label}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Stack>
+
+          <Divider orientation="vertical" flexItem />
+
+          {/* Status select */}
           <TextField
             select size="small" value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            sx={{ minWidth: 140, '& .MuiInputBase-input': { fontSize: 12 } }}
+            sx={{ minWidth: 130, '& .MuiInputBase-input': { fontSize: 12 } }}
             SelectProps={{ displayEmpty: true }}
           >
             <MenuItem value="" sx={{ fontSize: 12 }}>All statuses</MenuItem>
@@ -876,20 +918,37 @@ export function IssuesView({
               <MenuItem key={s.value} value={s.value} sx={{ fontSize: 12 }}>{s.label}</MenuItem>
             ))}
           </TextField>
-          <TextField
-            select size="small" value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            sx={{ minWidth: 140, '& .MuiInputBase-input': { fontSize: 12 } }}
-            SelectProps={{ displayEmpty: true }}
-          >
-            <MenuItem value="" sx={{ fontSize: 12 }}>All types</MenuItem>
-            {['Bug', 'Missing Feature', 'Clarification'].map((tp) => (
-              <MenuItem key={tp} value={tp} sx={{ fontSize: 12 }}>{tp}</MenuItem>
-            ))}
-          </TextField>
-          {(filterSearch || filterStatus || filterType) && (
-            <Button size="small" variant="text" sx={{ fontSize: 12, color: 'text.secondary' }}
-              onClick={() => { setFilterSearch(''); setFilterStatus(''); setFilterType(''); }}>
+
+          <Divider orientation="vertical" flexItem />
+
+          {/* Type pills */}
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            {(['', 'Bug', 'Missing Feature', 'Clarification'] as const).map((tp) => {
+              const active = filterType === tp;
+              return (
+                <Box
+                  key={tp || 'all-type'}
+                  onClick={() => setFilterType((prev) => prev === tp ? '' : tp)}
+                  sx={{
+                    px: 1.25, py: 0.4, borderRadius: '6px', cursor: 'pointer',
+                    border: '1px solid',
+                    borderColor: active ? 'primary.main' : 'divider',
+                    bgcolor: active ? 'primary.50' : 'transparent',
+                    transition: 'all .12s',
+                    '&:hover': { borderColor: 'primary.main' },
+                  }}
+                >
+                  <Typography sx={{ fontSize: 12, fontWeight: active ? 700 : 500, color: active ? 'primary.main' : 'text.secondary', lineHeight: 1 }}>
+                    {tp || 'All types'}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Stack>
+
+          {(filterSearch || filterStatus || filterType || filterPriority) && (
+            <Button size="small" variant="text" sx={{ fontSize: 12, color: 'text.secondary', minWidth: 0 }}
+              onClick={() => { setFilterSearch(''); setFilterStatus(''); setFilterType(''); setFilterPriority(''); }}>
               Clear
             </Button>
           )}
