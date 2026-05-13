@@ -496,12 +496,14 @@ export function IssuesView({
   const [formError,   setFormError]   = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Open drawer from deep link (?issue=ID) — e.g. from Telegram notification
+  // Open drawer from deep link (?issue=ID or ?issue=number) — legacy fallback
   useEffect(() => {
-    const issueId = searchParams.get('issue');
-    if (issueId && tickets.length > 0) {
-      const exists = tickets.some((t) => t.id === issueId);
-      if (exists) setDrawerTicketId(issueId);
+    const issueRef = searchParams.get('issue');
+    if (issueRef && tickets.length > 0) {
+      const byId  = tickets.find((t) => t.id === issueRef);
+      const byNum = tickets.find((t) => t.ticket_number !== null && String(t.ticket_number) === issueRef);
+      const match = byId ?? byNum;
+      if (match) setDrawerTicketId(match.id);
     }
   }, [searchParams, tickets]);
 

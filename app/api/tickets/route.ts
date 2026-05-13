@@ -132,12 +132,13 @@ export async function POST(req: NextRequest) {
     const { data: folder } = await adminClient
       .from('folders').select('slug, company_id').eq('id', folder_id).single();
 
+    const ref = ticketNumber ?? data.id;
     let link = `/?issue=${data.id}`;
     if (folder?.slug && folder.company_id) {
       const { data: company } = await adminClient
         .from('companies').select('slug').eq('id', folder.company_id).single();
       if (company?.slug) {
-        link = `/${company.slug}/${folder.slug}?tab=issues&issue=${data.id}`;
+        link = `/${company.slug}/${folder.slug}/issues/${ref}`;
       }
     }
 

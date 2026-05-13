@@ -100,12 +100,13 @@ export async function PATCH(
         // Build link to the issue
         const { data: folder } = await adminClient
           .from('folders').select('slug, company_id').eq('id', current.folder_id).single();
+        const ticketRef = (data.metadata as Record<string, unknown>)?.ticket_number ?? id;
         let link = `/?issue=${id}`;
         if (folder?.slug && folder.company_id) {
           const { data: company } = await adminClient
             .from('companies').select('slug').eq('id', folder.company_id).single();
           if (company?.slug) {
-            link = `/${company.slug}/${folder.slug}?tab=issues&issue=${id}`;
+            link = `/${company.slug}/${folder.slug}/issues/${ticketRef}`;
           }
         }
 

@@ -478,7 +478,7 @@ export function AdminTicketsClient() {
                     <Tooltip title="Open in project" placement="left">
                       <IconButton size="small"
                         component="a"
-                        href={`/${t.company_slug}/${t.project_slug}?tab=issues&issue=${t.id}`}
+                        href={`/${t.company_slug}/${t.project_slug}/issues/${t.ticket_number ?? t.id}`}
                         target="_blank" rel="noopener">
                         <OpenInNewIcon sx={{ fontSize: 13 }} />
                       </IconButton>
@@ -595,7 +595,7 @@ export function AdminTicketsClient() {
                 {drawerTicket.company_slug && drawerTicket.project_slug && (
                   <Button size="small" variant="text" endIcon={<OpenInNewIcon sx={{ fontSize: 13 }} />}
                     component="a"
-                    href={`/${drawerTicket.company_slug}/${drawerTicket.project_slug}?tab=issues&issue=${drawerTicket.id}`}
+                    href={`/${drawerTicket.company_slug}/${drawerTicket.project_slug}/issues/${drawerTicket.ticket_number ?? drawerTicket.id}`}
                     target="_blank" rel="noopener">
                     Open in project
                   </Button>
