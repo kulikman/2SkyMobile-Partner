@@ -1,10 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Alert from '@mui/material/Alert';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
@@ -17,6 +22,8 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import CloseIcon from '@mui/icons-material/Close';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SendIcon from '@mui/icons-material/Send';
 
@@ -59,17 +66,45 @@ type Comment = {
   created_at: string;
 };
 
+type FormState = {
+  title: string;
+  description: string;
+  url: string;
+  module: string;
+  type: string;
+  priority: string;
+  severity: string;
+  comments: string;
+};
+
 // ── Constants ──────────────────────────────────────────────────────────────
+
+const MODULES = [
+  'Partner Management', 'Users', 'Users Management', 'Billing Management',
+  'Rates Management', 'Roles Management', 'Sponsors Management',
+  'Providers Management', 'Providers Integration', 'Entire Platform', 'Other',
+];
+
+const TYPES = ['Bug', 'Missing Feature', 'Clarification'] as const;
 
 const STATUSES = ['new', 'in_progress', 'on_hold', 'ready_for_testing', 'approved', 'closed'] as const;
 
+const PRIORITIES_LIST = ['high', 'medium', 'low'] as const;
+
+const SEVERITIES = ['major', 'moderate', 'minor'] as const;
+
+const EMPTY_FORM: FormState = {
+  title: '', description: '', url: '',
+  module: '', type: '', priority: 'medium', severity: 'moderate', comments: '',
+};
+
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  new:              { label: 'New',              color: '#64748b', bg: '#f1f5f9' },
-  in_progress:      { label: 'In Progress',      color: '#1d4ed8', bg: '#eff6ff' },
-  on_hold:          { label: 'On Hold',          color: '#7c3aed', bg: '#f5f3ff' },
-  ready_for_testing:{ label: 'Ready for Test',   color: '#b45309', bg: '#fffbeb' },
-  approved:         { label: 'Approved',         color: '#15803d', bg: '#f0fdf4' },
-  closed:           { label: 'Closed',           color: '#374151', bg: '#f9fafb' },
+  new:               { label: 'New',           color: '#64748b', bg: '#f1f5f9' },
+  in_progress:       { label: 'In Progress',   color: '#1d4ed8', bg: '#eff6ff' },
+  on_hold:           { label: 'On Hold',       color: '#7c3aed', bg: '#f5f3ff' },
+  ready_for_testing: { label: 'Ready for Test',color: '#b45309', bg: '#fffbeb' },
+  approved:          { label: 'Approved',      color: '#15803d', bg: '#f0fdf4' },
+  closed:            { label: 'Closed',        color: '#374151', bg: '#f9fafb' },
 };
 
 const PRIORITY_COLOR: Record<string, string> = {
@@ -100,20 +135,13 @@ function initials(email: string) {
 function StatusBadge({ status, size = 'sm' }: { status: string; size?: 'sm' | 'md' }) {
   const m = STATUS_META[status] ?? STATUS_META.new;
   return (
-    <Box
-      sx={{
-        display: 'inline-flex', alignItems: 'center',
-        px: size === 'md' ? 1.25 : 1,
-        py: size === 'md' ? 0.5 : 0.25,
-        borderRadius: '6px',
-        bgcolor: m.bg,
-        color: m.color,
-        fontSize: size === 'md' ? 12 : 11,
-        fontWeight: 600,
-        whiteSpace: 'nowrap',
-        lineHeight: 1.5,
-      }}
-    >
+    <Box sx={{
+      display: 'inline-flex', alignItems: 'center',
+      px: size === 'md' ? 1.25 : 1, py: size === 'md' ? 0.5 : 0.25,
+      borderRadius: '6px', bgcolor: m.bg, color: m.color,
+      fontSize: size === 'md' ? 12 : 11, fontWeight: 600,
+      whiteSpace: 'nowrap', lineHeight: 1.5,
+    }}>
       {m.label}
     </Box>
   );
@@ -123,14 +151,12 @@ function TypeBadge({ type }: { type: string | null }) {
   if (!type) return <Typography variant="caption" color="text.disabled">—</Typography>;
   const m = TYPE_META[type] ?? { color: '#64748b', bg: '#f1f5f9' };
   return (
-    <Box
-      sx={{
-        display: 'inline-flex', alignItems: 'center',
-        px: 1, py: 0.25, borderRadius: '6px',
-        bgcolor: m.bg, color: m.color,
-        fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', lineHeight: 1.5,
-      }}
-    >
+    <Box sx={{
+      display: 'inline-flex', alignItems: 'center',
+      px: 1, py: 0.25, borderRadius: '6px',
+      bgcolor: m.bg, color: m.color,
+      fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', lineHeight: 1.5,
+    }}>
       {type}
     </Box>
   );
@@ -139,24 +165,35 @@ function TypeBadge({ type }: { type: string | null }) {
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function AdminTicketsClient() {
-  const [tickets,     setTickets]     = useState<EnrichedTicket[]>([]);
-  const [users,       setUsers]       = useState<AdminUser[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [companyTab,  setCompanyTab]  = useState('all');
-  const [statusF,     setStatusF]     = useState('');
-  const [priorityF,   setPriorityF]   = useState('');
+  const [tickets,    setTickets]    = useState<EnrichedTicket[]>([]);
+  const [users,      setUsers]      = useState<AdminUser[]>([]);
+  const [loading,    setLoading]    = useState(true);
+
+  // Filters
+  const [companyTab, setCompanyTab] = useState('all');
+  const [statusF,    setStatusF]    = useState('');
+  const [priorityF,  setPriorityF]  = useState('');
+  const [typeF,      setTypeF]      = useState('');
 
   // Drawer
-  const [drawerId,    setDrawerId]    = useState<string | null>(null);
-  const [drawerCmts,  setDrawerCmts]  = useState<Comment[]>([]);
-  const [commentTxt,  setCommentTxt]  = useState('');
-  const [sendingCmt,  setSendingCmt]  = useState(false);
-  const [updatingId,  setUpdatingId]  = useState<string | null>(null);
+  const [drawerId,   setDrawerId]   = useState<string | null>(null);
+  const [drawerCmts, setDrawerCmts] = useState<Comment[]>([]);
+  const [commentTxt, setCommentTxt] = useState('');
+  const [sendingCmt, setSendingCmt] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // ── Load ───────────────────────────────────────────────────────────────
+  // Edit dialog
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<EnrichedTicket | null>(null);
+  const [form,       setForm]       = useState<FormState>(EMPTY_FORM);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError,  setFormError]  = useState('');
 
-  useEffect(() => {
+  // ── Load + auto-refresh ────────────────────────────────────────────────
+
+  const load = useCallback((showLoading = false) => {
+    if (showLoading) setLoading(true);
     fetch('/api/admin/tickets')
       .then((r) => r.json())
       .then((d) => {
@@ -164,13 +201,18 @@ export function AdminTicketsClient() {
           setTickets(d.tickets);
           setUsers(d.users ?? []);
         } else if (Array.isArray(d)) {
-          // backwards-compat with old API shape
           setTickets(d);
         }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    load(true);
+    const id = setInterval(() => load(false), 30_000);
+    return () => clearInterval(id);
+  }, [load]);
 
   useEffect(() => {
     if (!drawerId) return;
@@ -194,8 +236,9 @@ export function AdminTicketsClient() {
     if (companyTab !== 'all' && t.company_name !== companyTab) return false;
     if (statusF   && t.status   !== statusF)   return false;
     if (priorityF && t.priority !== priorityF) return false;
+    if (typeF     && t.type     !== typeF)     return false;
     return true;
-  }), [tickets, companyTab, statusF, priorityF]);
+  }), [tickets, companyTab, statusF, priorityF, typeF]);
 
   const stats = useMemo(() => {
     const c: Record<string, number> = {};
@@ -208,9 +251,7 @@ export function AdminTicketsClient() {
 
   const companyCounts = useMemo(() => {
     const c: Record<string, number> = { all: tickets.length };
-    tickets.forEach((t) => {
-      if (t.company_name) c[t.company_name] = (c[t.company_name] ?? 0) + 1;
-    });
+    tickets.forEach((t) => { if (t.company_name) c[t.company_name] = (c[t.company_name] ?? 0) + 1; });
     return c;
   }, [tickets]);
 
@@ -240,6 +281,73 @@ export function AdminTicketsClient() {
     });
   }, [users]);
 
+  const deleteTicket = useCallback(async (id: string) => {
+    if (!window.confirm('Delete this issue? This cannot be undone.')) return;
+    const res = await fetch(`/api/tickets/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setTickets((prev) => prev.filter((t) => t.id !== id));
+      if (drawerId === id) setDrawerId(null);
+    }
+  }, [drawerId]);
+
+  function openEdit(t: EnrichedTicket) {
+    setEditTarget(t);
+    setForm({
+      title:       t.title,
+      description: t.description ?? '',
+      url:         t.url ?? '',
+      module:      t.module ?? '',
+      type:        t.type ?? '',
+      priority:    t.priority || 'medium',
+      severity:    t.severity || 'moderate',
+      comments:    t.comments ?? '',
+    });
+    setFormError('');
+    setDialogOpen(true);
+  }
+
+  function closeDialog() {
+    if (submitting) return;
+    setDialogOpen(false);
+    setFormError('');
+  }
+
+  function setField<K extends keyof FormState>(key: K, val: FormState[K]) {
+    setForm((prev) => ({ ...prev, [key]: val }));
+  }
+
+  async function handleSubmit() {
+    if (!editTarget || !form.title.trim()) return;
+    setSubmitting(true);
+    setFormError('');
+    try {
+      const res = await fetch(`/api/tickets/${editTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title:       form.title.trim(),
+          description: form.description.trim() || null,
+          url:         form.url.trim() || null,
+          module:      form.module || null,
+          type:        form.type || null,
+          priority:    form.priority,
+          severity:    form.severity,
+          comments:    form.comments.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setFormError(data.error ?? 'Failed to update'); return; }
+      setTickets((prev) => prev.map((t) =>
+        t.id === editTarget.id ? { ...t, ...data, updated_at: data.updated_at ?? t.updated_at } : t,
+      ));
+      setDialogOpen(false);
+    } catch {
+      setFormError('Unexpected error. Try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   const sendComment = useCallback(async () => {
     if (!drawerId || !commentTxt.trim()) return;
     setSendingCmt(true);
@@ -257,7 +365,7 @@ export function AdminTicketsClient() {
 
   return (
     <Box>
-      {/* ── Header ─────────────────────────────────────────────────── */}
+      {/* Header */}
       <Stack direction="row" alignItems="baseline" spacing={1.5} mb={3}>
         <Typography variant="h5" fontWeight={700}>Issues</Typography>
         <Typography variant="body2" color="text.secondary">
@@ -265,24 +373,18 @@ export function AdminTicketsClient() {
         </Typography>
       </Stack>
 
-      {/* ── Status stat pills ──────────────────────────────────────── */}
+      {/* Status stat pills */}
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap mb={3}>
         {STATUSES.map((s) => {
           const m = STATUS_META[s];
           const active = statusF === s;
           return (
-            <Box
-              key={s}
-              onClick={() => setStatusF((p) => p === s ? '' : s)}
-              sx={{
-                width: 120, px: 1.5, py: 0.75, borderRadius: '8px', cursor: 'pointer',
-                border: '1px solid',
-                borderColor: active ? m.color : 'divider',
-                bgcolor: active ? m.bg : 'transparent',
-                transition: 'all .12s',
-                '&:hover': { borderColor: m.color, bgcolor: m.bg },
-              }}
-            >
+            <Box key={s} onClick={() => setStatusF((p) => p === s ? '' : s)} sx={{
+              width: 120, px: 1.5, py: 0.75, borderRadius: '8px', cursor: 'pointer',
+              border: '1px solid', borderColor: active ? m.color : 'divider',
+              bgcolor: active ? m.bg : 'transparent', transition: 'all .12s',
+              '&:hover': { borderColor: m.color, bgcolor: m.bg },
+            }}>
               <Typography sx={{ fontSize: 18, fontWeight: 700, color: active ? m.color : 'text.primary', lineHeight: 1 }}>
                 {stats[s] ?? 0}
               </Typography>
@@ -298,49 +400,66 @@ export function AdminTicketsClient() {
         )}
       </Stack>
 
-      {/* ── Company dropdown + Priority filter ────────────────────── */}
+      {/* Compact filters: company · priority · type */}
       <Stack direction="row" alignItems="center" justifyContent="space-between"
         flexWrap="wrap" useFlexGap spacing={1} mb={2}>
-        <TextField
-          select size="small"
-          value={companyTab}
+        {/* Company dropdown */}
+        <TextField select size="small" value={companyTab}
           onChange={(e) => setCompanyTab(e.target.value)}
           sx={{ minWidth: 200, fontSize: 13 }}
-          SelectProps={{ displayEmpty: true }}
-        >
+          SelectProps={{ displayEmpty: true }}>
           <MenuItem value="all">All companies ({companyCounts.all ?? 0})</MenuItem>
           {companies.map((c) => (
             <MenuItem key={c} value={c}>{c} ({companyCounts[c] ?? 0})</MenuItem>
           ))}
         </TextField>
-        <Stack direction="row" spacing={1} alignItems="center">
-          {(['', 'high', 'medium', 'low'] as const).map((p) => (
-            <Box
-              key={p}
-              onClick={() => setPriorityF((prev) => prev === p ? '' : p)}
-              sx={{
-                display: 'flex', alignItems: 'center', gap: 0.5,
-                px: 1, py: 0.5, borderRadius: '6px', cursor: 'pointer',
-                border: '1px solid',
-                borderColor: priorityF === p ? (PRIORITY_COLOR[p] ?? 'divider') : 'divider',
-                bgcolor: priorityF === p ? (PRIORITY_COLOR[p] ?? 'transparent') + '18' : 'transparent',
-                '&:hover': { borderColor: PRIORITY_COLOR[p] ?? 'text.secondary' },
-              }}
-            >
+
+        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+          {/* Priority dots */}
+          {(['', ...PRIORITIES_LIST] as const).map((p) => (
+            <Box key={p || 'all'} onClick={() => setPriorityF((prev) => prev === p ? '' : p)} sx={{
+              display: 'flex', alignItems: 'center', gap: 0.5,
+              px: 1, py: 0.5, borderRadius: '6px', cursor: 'pointer',
+              border: '1px solid',
+              borderColor: priorityF === p ? (PRIORITY_COLOR[p] ?? 'primary.main') : 'divider',
+              bgcolor: priorityF === p ? (PRIORITY_COLOR[p] ? PRIORITY_COLOR[p] + '18' : 'action.selected') : 'transparent',
+              '&:hover': { borderColor: PRIORITY_COLOR[p] ?? 'text.secondary' },
+            }}>
               {p ? (
                 <>
                   <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: PRIORITY_COLOR[p] }} />
                   <Typography sx={{ fontSize: 11, fontWeight: 600, textTransform: 'capitalize' }}>{p}</Typography>
                 </>
               ) : (
-                <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>All priority</Typography>
+                <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>All</Typography>
               )}
             </Box>
           ))}
+
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+          {/* Type pills */}
+          {(['', ...TYPES] as const).map((tp) => {
+            const m = tp ? (TYPE_META[tp] ?? null) : null;
+            const active = typeF === tp;
+            return (
+              <Box key={tp || 'all-type'} onClick={() => setTypeF((prev) => prev === tp ? '' : tp)} sx={{
+                px: 1, py: 0.5, borderRadius: '6px', cursor: 'pointer',
+                border: '1px solid',
+                borderColor: active && m ? m.color : active ? 'primary.main' : 'divider',
+                bgcolor: active && m ? m.bg : active ? 'action.selected' : 'transparent',
+                '&:hover': { borderColor: m?.color ?? 'text.secondary' },
+              }}>
+                <Typography sx={{ fontSize: 11, fontWeight: active ? 700 : 500, color: active && m ? m.color : 'text.secondary' }}>
+                  {tp || 'All types'}
+                </Typography>
+              </Box>
+            );
+          })}
         </Stack>
       </Stack>
 
-      {/* ── Table ──────────────────────────────────────────────────── */}
+      {/* Table */}
       {loading ? (
         <Box sx={{ py: 8, textAlign: 'center' }}><CircularProgress size={28} /></Box>
       ) : filtered.length === 0 ? (
@@ -349,14 +468,12 @@ export function AdminTicketsClient() {
         </Typography>
       ) : (
         <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
-          {/* Table head */}
+          {/* Head */}
           <Box sx={{
             display: 'grid',
-            gridTemplateColumns: '56px 12px 1fr 140px 100px 130px 120px 60px 28px',
-            px: 2, py: 1,
-            bgcolor: 'action.hover',
-            borderBottom: '1px solid', borderColor: 'divider',
-            gap: 1.5,
+            gridTemplateColumns: '56px 12px 1fr 140px 100px 130px 120px 60px 72px',
+            px: 2, py: 1, bgcolor: 'action.hover',
+            borderBottom: '1px solid', borderColor: 'divider', gap: 1.5,
           }}>
             {['#', '', 'Issue', 'Company / Project', 'Type', 'Assignee', 'Status', 'Date', ''].map((h, i) => (
               <Typography key={i} variant="caption" fontWeight={700} color="text.secondary"
@@ -369,32 +486,21 @@ export function AdminTicketsClient() {
           {/* Rows */}
           {filtered.map((t, idx) => (
             <Box key={t.id}>
-              <Box
-                onClick={() => setDrawerId(t.id)}
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: '56px 12px 1fr 140px 100px 130px 120px 60px 28px',
-                  px: 2, py: 1.25, gap: 1.5,
-                  cursor: 'pointer', alignItems: 'center',
-                  '&:hover': { bgcolor: 'action.hover' },
-                  transition: 'background .1s',
-                }}
-              >
-                {/* Ticket number */}
+              <Box onClick={() => setDrawerId(t.id)} sx={{
+                display: 'grid',
+                gridTemplateColumns: '56px 12px 1fr 140px 100px 130px 120px 60px 72px',
+                px: 2, py: 1.25, gap: 1.5, cursor: 'pointer', alignItems: 'center',
+                '&:hover': { bgcolor: 'action.hover' }, transition: 'background .1s',
+              }}>
                 <Typography variant="caption" fontWeight={600}
                   sx={{ color: 'text.disabled', fontFamily: 'monospace', fontSize: 11 }}>
                   {ticketNum(t.ticket_number) ?? '—'}
                 </Typography>
 
-                {/* Priority dot */}
                 <Tooltip title={`${t.priority} priority`} placement="top">
-                  <Box sx={{
-                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                    bgcolor: PRIORITY_COLOR[t.priority] ?? '#aaa',
-                  }} />
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, bgcolor: PRIORITY_COLOR[t.priority] ?? '#aaa' }} />
                 </Tooltip>
 
-                {/* Title */}
                 <Box sx={{ overflow: 'hidden' }}>
                   <Typography variant="body2" fontWeight={500}
                     sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -402,7 +508,6 @@ export function AdminTicketsClient() {
                   </Typography>
                 </Box>
 
-                {/* Company / Project */}
                 <Box sx={{ overflow: 'hidden' }}>
                   {t.company_name && (
                     <Typography variant="caption" fontWeight={600} color="text.primary"
@@ -418,66 +523,53 @@ export function AdminTicketsClient() {
                   )}
                 </Box>
 
-                {/* Type */}
                 <Box><TypeBadge type={t.type} /></Box>
 
-                {/* Assignee */}
                 <Box onClick={(e) => e.stopPropagation()}>
-                  <Select
-                    size="small"
-                    value={t.assigned_to ?? ''}
+                  <Select size="small" value={t.assigned_to ?? ''} displayEmpty
                     onChange={(e) => changeAssignee(t.id, e.target.value || null)}
-                    displayEmpty
                     sx={{ fontSize: 11, height: 26, minWidth: 120,
                       '& .MuiSelect-select': { py: 0.25, px: 1, display: 'flex', alignItems: 'center', gap: 0.5 } }}
                     renderValue={(v) => v ? (
                       <Typography sx={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100 }}>
                         {users.find((u) => u.id === v)?.email?.split('@')[0] ?? '—'}
                       </Typography>
-                    ) : (
-                      <Typography sx={{ fontSize: 11, color: 'text.disabled' }}>Unassigned</Typography>
-                    )}
-                  >
+                    ) : <Typography sx={{ fontSize: 11, color: 'text.disabled' }}>Unassigned</Typography>}>
                     <MenuItem value=""><em style={{ fontSize: 11 }}>Unassigned</em></MenuItem>
-                    {users.map((u) => (
-                      <MenuItem key={u.id} value={u.id} sx={{ fontSize: 11 }}>
-                        {u.email}
-                      </MenuItem>
-                    ))}
+                    {users.map((u) => <MenuItem key={u.id} value={u.id} sx={{ fontSize: 11 }}>{u.email}</MenuItem>)}
                   </Select>
                 </Box>
 
-                {/* Status */}
                 <Box onClick={(e) => e.stopPropagation()}>
-                  <Select
-                    size="small"
-                    value={t.status}
-                    disabled={updatingId === t.id}
+                  <Select size="small" value={t.status} disabled={updatingId === t.id}
                     onChange={(e) => changeStatus(t.id, e.target.value)}
                     sx={{ fontSize: 11, height: 26, minWidth: 118,
                       '& .MuiSelect-select': { py: 0.25, px: 0.5 },
                       '& .MuiOutlinedInput-notchedOutline': { border: 'none' } }}
-                    renderValue={(v) => <StatusBadge status={v} />}
-                  >
-                    {STATUSES.map((s) => (
-                      <MenuItem key={s} value={s} sx={{ fontSize: 12 }}>
-                        <StatusBadge status={s} size="md" />
-                      </MenuItem>
-                    ))}
+                    renderValue={(v) => <StatusBadge status={v} />}>
+                    {STATUSES.map((s) => <MenuItem key={s} value={s} sx={{ fontSize: 12 }}><StatusBadge status={s} size="md" /></MenuItem>)}
                   </Select>
                 </Box>
 
-                {/* Date */}
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
                   {fmtDate(t.created_at)}
                 </Typography>
 
-                {/* Open link */}
-                <Box onClick={(e) => e.stopPropagation()}>
+                {/* Row actions */}
+                <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                  <Tooltip title="Edit">
+                    <IconButton size="small" onClick={() => openEdit(t)}>
+                      <EditIcon sx={{ fontSize: 13 }} />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete">
+                    <IconButton size="small" color="error" onClick={() => deleteTicket(t.id)}>
+                      <DeleteIcon sx={{ fontSize: 13 }} />
+                    </IconButton>
+                  </Tooltip>
                   {t.company_slug && t.project_slug && (
                     <Tooltip title="Open in project" placement="left">
-                      <IconButton size="small"
-                        component="a"
+                      <IconButton size="small" component="a"
                         href={`/${t.company_slug}/${t.project_slug}/issues/${t.ticket_number ?? t.id}`}
                         target="_blank" rel="noopener">
                         <OpenInNewIcon sx={{ fontSize: 13 }} />
@@ -492,22 +584,13 @@ export function AdminTicketsClient() {
         </Paper>
       )}
 
-      {/* ── Detail drawer (no backdrop) ─────────────────────────── */}
-      <Drawer
-        anchor="right"
-        open={!!drawerTicket}
-        onClose={() => setDrawerId(null)}
-        hideBackdrop
-        variant="persistent"
-        PaperProps={{
-          sx: {
-            width: { xs: '100vw', sm: 460 },
-            display: 'flex', flexDirection: 'column',
-            boxShadow: '-4px 0 24px rgba(0,0,0,.08)',
-            borderLeft: '1px solid', borderColor: 'divider',
-          },
-        }}
-      >
+      {/* ── Detail drawer ──────────────────────────────────────────────── */}
+      <Drawer anchor="right" open={!!drawerTicket} onClose={() => setDrawerId(null)}
+        hideBackdrop variant="persistent"
+        PaperProps={{ sx: {
+          width: { xs: '100vw', sm: 460 }, display: 'flex', flexDirection: 'column',
+          boxShadow: '-4px 0 24px rgba(0,0,0,.08)', borderLeft: '1px solid', borderColor: 'divider',
+        } }}>
         {drawerTicket && (
           <>
             {/* Drawer header */}
@@ -532,14 +615,26 @@ export function AdminTicketsClient() {
                   {[drawerTicket.company_name, drawerTicket.project_name].filter(Boolean).join(' · ')}
                 </Typography>
               </Box>
-              <IconButton size="small" onClick={() => setDrawerId(null)} sx={{ flexShrink: 0 }}>
-                <CloseIcon fontSize="small" />
-              </IconButton>
+              <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
+                <Tooltip title="Edit">
+                  <IconButton size="small" onClick={() => openEdit(drawerTicket)}>
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Delete">
+                  <IconButton size="small" color="error" onClick={() => deleteTicket(drawerTicket.id)}>
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <IconButton size="small" onClick={() => setDrawerId(null)}>
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Stack>
             </Stack>
 
             <Box sx={{ flex: 1, overflowY: 'auto', px: 2.5, py: 2 }}>
 
-              {/* ── Status segmented control ─────────────────────── */}
+              {/* Status segmented control */}
               <Typography variant="caption" fontWeight={600} color="text.disabled"
                 sx={{ textTransform: 'uppercase', letterSpacing: 0.6, mb: 1, display: 'block' }}>
                 Status
@@ -548,49 +643,37 @@ export function AdminTicketsClient() {
                 {STATUSES.map((s) => {
                   const m = STATUS_META[s];
                   const active = drawerTicket.status === s;
-                  const loading = updatingId === drawerTicket.id;
+                  const busy = updatingId === drawerTicket.id;
                   return (
-                    <Box
-                      key={s}
-                      onClick={() => !loading && changeStatus(drawerTicket.id, s)}
-                      sx={{
-                        px: 1.25, py: 0.5, borderRadius: '6px',
-                        border: '1.5px solid',
-                        borderColor: active ? m.color : 'divider',
-                        bgcolor: active ? m.bg : 'transparent',
-                        color: active ? m.color : 'text.secondary',
-                        fontSize: 11, fontWeight: active ? 700 : 500,
-                        cursor: loading ? 'default' : 'pointer',
-                        opacity: loading ? 0.6 : 1,
-                        transition: 'all .12s',
-                        '&:hover': !loading ? { borderColor: m.color, color: m.color } : {},
-                      }}
-                    >
+                    <Box key={s} onClick={() => !busy && changeStatus(drawerTicket.id, s)} sx={{
+                      px: 1.25, py: 0.5, borderRadius: '6px', border: '1.5px solid',
+                      borderColor: active ? m.color : 'divider',
+                      bgcolor: active ? m.bg : 'transparent',
+                      color: active ? m.color : 'text.secondary',
+                      fontSize: 11, fontWeight: active ? 700 : 500,
+                      cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1,
+                      transition: 'all .12s',
+                      '&:hover': !busy ? { borderColor: m.color, color: m.color } : {},
+                    }}>
                       {m.label}
                     </Box>
                   );
                 })}
               </Stack>
 
-              {/* ── Quick actions ───────────────────────────────── */}
+              {/* Quick actions */}
               <Stack direction="row" spacing={1} mb={2.5} flexWrap="wrap" useFlexGap>
                 {drawerTicket.status === 'new' && (
                   <Button size="small" variant="outlined" startIcon={<span>▶</span>}
-                    onClick={() => changeStatus(drawerTicket.id, 'in_progress')}>
-                    Take
-                  </Button>
+                    onClick={() => changeStatus(drawerTicket.id, 'in_progress')}>Take</Button>
                 )}
                 {drawerTicket.status === 'in_progress' && (
                   <Button size="small" variant="outlined" color="warning"
-                    onClick={() => changeStatus(drawerTicket.id, 'ready_for_testing')}>
-                    Mark done
-                  </Button>
+                    onClick={() => changeStatus(drawerTicket.id, 'ready_for_testing')}>Mark done</Button>
                 )}
-                {!['closed'].includes(drawerTicket.status) && (
+                {drawerTicket.status !== 'closed' && (
                   <Button size="small" variant="outlined" color="error"
-                    onClick={() => changeStatus(drawerTicket.id, 'closed')}>
-                    Close
-                  </Button>
+                    onClick={() => changeStatus(drawerTicket.id, 'closed')}>Close</Button>
                 )}
                 {drawerTicket.company_slug && drawerTicket.project_slug && (
                   <Button size="small" variant="text" endIcon={<OpenInNewIcon sx={{ fontSize: 13 }} />}
@@ -602,35 +685,24 @@ export function AdminTicketsClient() {
                 )}
               </Stack>
 
-              {/* ── Assignee ─────────────────────────────────────── */}
+              {/* Assignee */}
               <Box mb={2}>
                 <Typography variant="caption" fontWeight={600} color="text.disabled"
                   sx={{ textTransform: 'uppercase', letterSpacing: 0.6, mb: 0.75, display: 'block' }}>
                   Assignee
                 </Typography>
-                <Select
-                  size="small"
-                  fullWidth
-                  value={drawerTicket.assigned_to ?? ''}
+                <Select size="small" fullWidth value={drawerTicket.assigned_to ?? ''} displayEmpty
                   onChange={(e) => changeAssignee(drawerTicket.id, e.target.value || null)}
-                  displayEmpty
                   sx={{ fontSize: 13 }}
                   renderValue={(v) => v ? (
-                    <Typography sx={{ fontSize: 13 }}>
-                      {users.find((u) => u.id === v)?.email ?? '—'}
-                    </Typography>
-                  ) : <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Unassigned</Typography>}
-                >
+                    <Typography sx={{ fontSize: 13 }}>{users.find((u) => u.id === v)?.email ?? '—'}</Typography>
+                  ) : <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Unassigned</Typography>}>
                   <MenuItem value=""><em>Unassigned</em></MenuItem>
-                  {users.map((u) => (
-                    <MenuItem key={u.id} value={u.id}>
-                      {u.email}
-                    </MenuItem>
-                  ))}
+                  {users.map((u) => <MenuItem key={u.id} value={u.id}>{u.email}</MenuItem>)}
                 </Select>
               </Box>
 
-              {/* ── Meta grid ────────────────────────────────────── */}
+              {/* Meta grid */}
               <Paper variant="outlined" sx={{ borderRadius: 2, p: 1.5, mb: 2 }}>
                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
                   {([
@@ -638,10 +710,10 @@ export function AdminTicketsClient() {
                       <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: PRIORITY_COLOR[drawerTicket.priority] ?? '#aaa' }} />
                       <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>{drawerTicket.priority}</Typography>
                     </Box>],
-                    ['Severity',  <Typography key="s" variant="body2" sx={{ textTransform: 'capitalize' }}>{drawerTicket.severity}</Typography>],
-                    ['Module',    <Typography key="m" variant="body2">{drawerTicket.module ?? '—'}</Typography>],
-                    ['Created',   <Typography key="c" variant="body2">{fmtDate(drawerTicket.created_at)}</Typography>],
-                    ['Updated',   <Typography key="u" variant="body2">{fmtDate(drawerTicket.updated_at)}</Typography>],
+                    ['Severity', <Typography key="sv" variant="body2" sx={{ textTransform: 'capitalize' }}>{drawerTicket.severity}</Typography>],
+                    ['Module',   <Typography key="mo" variant="body2">{drawerTicket.module ?? '—'}</Typography>],
+                    ['Created',  <Typography key="cr" variant="body2">{fmtDate(drawerTicket.created_at)}</Typography>],
+                    ['Updated',  <Typography key="up" variant="body2">{fmtDate(drawerTicket.updated_at)}</Typography>],
                   ] as [string, React.ReactNode][]).map(([label, value]) => (
                     <Box key={label}>
                       <Typography variant="caption" color="text.disabled">{label}</Typography>
@@ -651,20 +723,16 @@ export function AdminTicketsClient() {
                 </Box>
               </Paper>
 
-              {/* Description */}
               {drawerTicket.description && (
                 <Box mb={2}>
                   <Typography variant="caption" fontWeight={600} color="text.disabled"
                     sx={{ textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', mb: 0.5 }}>
                     Description
                   </Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {drawerTicket.description}
-                  </Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{drawerTicket.description}</Typography>
                 </Box>
               )}
 
-              {/* URL */}
               {drawerTicket.url && (
                 <Box mb={2}>
                   <Typography variant="caption" fontWeight={600} color="text.disabled"
@@ -678,15 +746,13 @@ export function AdminTicketsClient() {
                 </Box>
               )}
 
-              {/* Screenshot */}
               {drawerTicket.screenshot_path && (
                 <Box mb={2}>
                   <Typography variant="caption" fontWeight={600} color="text.disabled"
                     sx={{ textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', mb: 0.5 }}>
                     Screenshot
                   </Typography>
-                  <Box
-                    component="img"
+                  <Box component="img"
                     src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/ticket-screenshots/${drawerTicket.screenshot_path}`}
                     alt="screenshot"
                     sx={{ width: '100%', borderRadius: 1.5, border: '1px solid', borderColor: 'divider', cursor: 'zoom-in' }}
@@ -698,22 +764,18 @@ export function AdminTicketsClient() {
                 </Box>
               )}
 
-              {/* Internal notes */}
               {drawerTicket.comments && (
                 <Box mb={2}>
                   <Typography variant="caption" fontWeight={600} color="text.disabled"
                     sx={{ textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', mb: 0.5 }}>
                     Notes
                   </Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {drawerTicket.comments}
-                  </Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{drawerTicket.comments}</Typography>
                 </Box>
               )}
 
               <Divider sx={{ mb: 2 }} />
 
-              {/* Comments */}
               <Typography variant="caption" fontWeight={600} color="text.disabled"
                 sx={{ textTransform: 'uppercase', letterSpacing: 0.6, mb: 1.5, display: 'block' }}>
                 Comments
@@ -742,14 +804,10 @@ export function AdminTicketsClient() {
             {/* Comment input */}
             <Box sx={{ px: 2.5, py: 2, borderTop: '1px solid', borderColor: 'divider' }}>
               <Stack direction="row" spacing={1}>
-                <TextField
-                  size="small" fullWidth
-                  placeholder="Write a comment…"
-                  value={commentTxt}
-                  onChange={(e) => setCommentTxt(e.target.value)}
+                <TextField size="small" fullWidth placeholder="Write a comment…"
+                  value={commentTxt} onChange={(e) => setCommentTxt(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendComment(); } }}
-                  multiline maxRows={4}
-                />
+                  multiline maxRows={4} />
                 <IconButton color="primary" disabled={!commentTxt.trim() || sendingCmt} onClick={sendComment}>
                   <SendIcon fontSize="small" />
                 </IconButton>
@@ -758,6 +816,65 @@ export function AdminTicketsClient() {
           </>
         )}
       </Drawer>
+
+      {/* ── Edit dialog ────────────────────────────────────────────────── */}
+      <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
+        <DialogTitle fontWeight={700}>Edit issue</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {formError && <Alert severity="error">{formError}</Alert>}
+
+            <TextField label="Title" value={form.title} autoFocus fullWidth
+              onChange={(e) => setField('title', e.target.value)} />
+
+            <TextField label="Description" value={form.description} fullWidth multiline rows={3}
+              onChange={(e) => setField('description', e.target.value)} />
+
+            <Stack direction="row" spacing={2}>
+              <TextField label="Module" select value={form.module} fullWidth
+                onChange={(e) => setField('module', e.target.value)}>
+                <MenuItem value=""><em>Select…</em></MenuItem>
+                {MODULES.map((m) => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+              </TextField>
+              <TextField label="Type" select value={form.type} fullWidth
+                onChange={(e) => setField('type', e.target.value)}>
+                <MenuItem value=""><em>Select…</em></MenuItem>
+                {TYPES.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+              </TextField>
+            </Stack>
+
+            <Stack direction="row" spacing={2}>
+              <TextField label="Priority" select value={form.priority} fullWidth
+                onChange={(e) => setField('priority', e.target.value)}>
+                {PRIORITIES_LIST.map((p) => (
+                  <MenuItem key={p} value={p} sx={{ textTransform: 'capitalize' }}>{p}</MenuItem>
+                ))}
+              </TextField>
+              <TextField label="Severity" select value={form.severity} fullWidth
+                onChange={(e) => setField('severity', e.target.value)}>
+                {SEVERITIES.map((s) => (
+                  <MenuItem key={s} value={s} sx={{ textTransform: 'capitalize' }}>{s}</MenuItem>
+                ))}
+              </TextField>
+            </Stack>
+
+            <TextField label="Page URL (optional)" placeholder="https://…"
+              value={form.url} fullWidth onChange={(e) => setField('url', e.target.value)} />
+
+            <TextField label="Internal notes (optional)" value={form.comments}
+              fullWidth multiline rows={2}
+              onChange={(e) => setField('comments', e.target.value)} />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={closeDialog} disabled={submitting}>Cancel</Button>
+          <Button variant="contained" onClick={handleSubmit}
+            disabled={submitting || !form.title.trim()}
+            startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : undefined}>
+            {submitting ? 'Saving…' : 'Save changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

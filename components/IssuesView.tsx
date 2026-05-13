@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -481,6 +481,11 @@ export function IssuesView({
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerTicketId, setDrawerTicketId] = useState<string | null>(null);
+
+  // Compact filters
+  const [filterSearch, setFilterSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterType,   setFilterType]   = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [ticketComments, setTicketComments] = useState<Map<string, TicketComment[]>>(new Map());
   const [sendingComment, setSendingComment] = useState<Set<string>>(new Set());
@@ -507,11 +512,23 @@ export function IssuesView({
     }
   }, [searchParams, tickets]);
 
+  const refresh = useCallback(() => {
+    fetch(`/api/tickets?folderId=${folderId}`)
+      .then((r) => r.json())
+      .then((d) => { if (Array.isArray(d)) setTickets(d); })
+      .catch(() => {});
+  }, [folderId]);
+
   useEffect(() => {
     fetch(`/api/tickets?folderId=${folderId}`)
       .then((r) => r.json())
       .then((d) => { setTickets(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
+    const id = setInterval(refresh, 30_000);
+    return () => clearInterval(id);
+  }, [folderId, refresh]);
+
+  useEffect(() => {
     fetch(`/api/ticket-comments?folderId=${folderId}`)
       .then((r) => r.json())
       .then((all) => {
@@ -704,12 +721,22 @@ export function IssuesView({
 
   // ── Data ──────────────────────────────────────────────────────────────────
 
+  const displayTickets = useMemo(() => tickets.filter((t) => {
+    if (filterStatus && t.status !== filterStatus) return false;
+    if (filterType   && t.type   !== filterType)   return false;
+    if (filterSearch) {
+      const q = filterSearch.toLowerCase();
+      if (!t.title.toLowerCase().includes(q) && !String(t.ticket_number ?? '').includes(q)) return false;
+    }
+    return true;
+  }), [tickets, filterStatus, filterType, filterSearch]);
+
   const groups = PRIORITIES.map((p) => ({
     priority: p,
-    items: tickets.filter((t) => t.priority === p.value),
+    items: displayTickets.filter((t) => t.priority === p.value),
   })).filter((g) => g.items.length > 0);
 
-  const ungrouped = tickets.filter((t) => !PRIORITIES.find((p) => p.value === t.priority));
+  const ungrouped = displayTickets.filter((t) => !PRIORITIES.find((p) => p.value === t.priority));
 
   const drawerTicket = drawerTicketId ? tickets.find((t) => t.id === drawerTicketId) ?? null : null;
 
@@ -826,9 +853,54 @@ export function IssuesView({
         </Button>
       </Stack>
 
+      {/* Compact filter bar */}
+      {tickets.length > 0 && (
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}
+          flexWrap="wrap" useFlexGap mb={2}>
+          <TextField
+            size="small"
+            placeholder="Search…"
+            value={filterSearch}
+            onChange={(e) => setFilterSearch(e.target.value)}
+            sx={{ width: 180, '& .MuiInputBase-input': { fontSize: 12 } }}
+            inputProps={{ 'aria-label': 'Search issues' }}
+          />
+          <TextField
+            select size="small" value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            sx={{ minWidth: 140, '& .MuiInputBase-input': { fontSize: 12 } }}
+            SelectProps={{ displayEmpty: true }}
+          >
+            <MenuItem value="" sx={{ fontSize: 12 }}>All statuses</MenuItem>
+            {STATUSES.map((s) => (
+              <MenuItem key={s.value} value={s.value} sx={{ fontSize: 12 }}>{s.label}</MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select size="small" value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            sx={{ minWidth: 140, '& .MuiInputBase-input': { fontSize: 12 } }}
+            SelectProps={{ displayEmpty: true }}
+          >
+            <MenuItem value="" sx={{ fontSize: 12 }}>All types</MenuItem>
+            {['Bug', 'Missing Feature', 'Clarification'].map((tp) => (
+              <MenuItem key={tp} value={tp} sx={{ fontSize: 12 }}>{tp}</MenuItem>
+            ))}
+          </TextField>
+          {(filterSearch || filterStatus || filterType) && (
+            <Button size="small" variant="text" sx={{ fontSize: 12, color: 'text.secondary' }}
+              onClick={() => { setFilterSearch(''); setFilterStatus(''); setFilterType(''); }}>
+              Clear
+            </Button>
+          )}
+        </Stack>
+      )}
+
       {/* Table */}
       {tickets.length === 0 ? (
         <Typography variant="body2" color="text.secondary">No issues reported yet.</Typography>
+      ) : displayTickets.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">No issues match the current filters.</Typography>
       ) : (
         <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
           <TableContainer>
