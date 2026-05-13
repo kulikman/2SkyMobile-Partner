@@ -72,7 +72,7 @@ export function ProjectTabs({
       <Box sx={{ display: tab === 3 ? 'block' : 'none' }}>
         <Paper variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
           <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress size={28} /></Box>}>
-            <IssuesView folderId={folderId} isAdmin={isAdmin} currentUser={currentUser} />
+            <IssuesView folderId={folderId} isAdmin={isAdmin} currentUser={currentUser} canonicalBase={canonicalBase} />
           </Suspense>
         </Paper>
       </Box>

@@ -25,6 +25,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
@@ -32,15 +33,19 @@ import ChatBubbleIcon from '@mui/icons-material/ChatBubble';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DoneIcon from '@mui/icons-material/Done';
 import EditIcon from '@mui/icons-material/Edit';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import LinkIcon from '@mui/icons-material/Link';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import SendIcon from '@mui/icons-material/Send';
 import UploadIcon from '@mui/icons-material/Upload';
+import NextLink from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -140,6 +145,11 @@ function ticketNum(n: number | null | undefined) {
   return `#${String(n).padStart(3, '0')}`;
 }
 
+function ticketPath(canonicalBase: string, ticket: Ticket): string {
+  const ref = ticket.ticket_number ?? ticket.id;
+  return `${canonicalBase}/issues/${ref}`;
+}
+
 function TypeChip({ type }: { type: string | null }) {
   if (!type) return null;
   const color = TYPE_COLORS[type] ?? '#9e9e9e';
@@ -168,6 +178,7 @@ function IssueDrawer({
   isAdmin,
   sending,
   updatingStatus,
+  canonicalBase,
   onClose,
   onStatusChange,
   onEdit,
@@ -181,6 +192,7 @@ function IssueDrawer({
   isAdmin: boolean;
   sending: boolean;
   updatingStatus: boolean;
+  canonicalBase?: string;
   onClose: () => void;
   onStatusChange: (status: string) => void;
   onEdit: () => void;
@@ -191,7 +203,18 @@ function IssueDrawer({
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const [draft, setDraft] = useState('');
   const [sendError, setSendError] = useState('');
+  const [copied, setCopied] = useState(false);
   const sm = statusMeta(ticket.status);
+
+  function copyLink() {
+    if (!canonicalBase) return;
+    const path = ticketPath(canonicalBase, ticket);
+    const url = typeof window !== 'undefined' ? `${window.location.origin}${path}` : path;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -261,6 +284,24 @@ function IssueDrawer({
               <IconButton size="small" color="error" onClick={onDelete} sx={{ mr: 0.25 }}>
                 <DeleteIcon sx={{ fontSize: 15 }} />
               </IconButton>
+            )}
+            {canonicalBase && (
+              <Tooltip title={copied ? 'Copied!' : 'Copy link'}>
+                <IconButton size="small" onClick={copyLink} sx={{ mr: 0.25 }}>
+                  {copied
+                    ? <DoneIcon sx={{ fontSize: 15, color: 'success.main' }} />
+                    : <ContentCopyIcon sx={{ fontSize: 15 }} />}
+                </IconButton>
+              </Tooltip>
+            )}
+            {canonicalBase && (
+              <Tooltip title="Open full page">
+                <NextLink href={ticketPath(canonicalBase, ticket)} target="_blank" rel="noopener noreferrer">
+                  <IconButton size="small" sx={{ mr: 0.25 }}>
+                    <OpenInNewIcon sx={{ fontSize: 15 }} />
+                  </IconButton>
+                </NextLink>
+              </Tooltip>
             )}
             <IconButton size="small" onClick={onClose}>
               <CloseIcon fontSize="small" />
@@ -425,7 +466,17 @@ function IssueDrawer({
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: string; isAdmin: boolean; currentUser: CurrentUser }) {
+export function IssuesView({
+  folderId,
+  isAdmin,
+  currentUser,
+  canonicalBase,
+}: {
+  folderId: string;
+  isAdmin: boolean;
+  currentUser: CurrentUser;
+  canonicalBase?: string;
+}) {
   const searchParams = useSearchParams();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -743,6 +794,15 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
                 ? <ChatBubbleIcon sx={{ fontSize: 15 }} />
                 : <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />}
             </IconButton>
+            {canonicalBase && (
+              <Tooltip title="Open full page">
+                <NextLink href={ticketPath(canonicalBase, ticket)} target="_blank" rel="noopener noreferrer">
+                  <IconButton size="small" sx={{ p: 0.25, color: 'text.disabled' }}>
+                    <OpenInNewIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </NextLink>
+              </Tooltip>
+            )}
           </Stack>
         </TableCell>
       </TableRow>
@@ -837,6 +897,7 @@ export function IssuesView({ folderId, isAdmin, currentUser }: { folderId: strin
             isAdmin={isAdmin}
             sending={sendingComment.has(drawerTicket.id)}
             updatingStatus={updatingStatus.has(drawerTicket.id)}
+            canonicalBase={canonicalBase}
             onClose={() => setDrawerTicketId(null)}
             onStatusChange={(status) => updateStatus(drawerTicket.id, status)}
             onEdit={() => { openEdit(drawerTicket); setDrawerTicketId(null); }}

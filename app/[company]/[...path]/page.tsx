@@ -31,7 +31,9 @@ import { splitDocumentContent } from '@/lib/document-content';
 import { ProjectDetail } from '@/components/ProjectDetail';
 import { ProjectTabs } from '@/components/ProjectTabs';
 import { CopyLinkButton } from '@/components/CopyLinkButton';
+import { TicketDetailClient } from '@/components/TicketDetailClient';
 import type { ProjectData } from '@/components/ProjectDetail';
+import type { TicketDetail, TicketComment } from '@/components/TicketDetailClient';
 
 const RESERVED = new Set([
   'login', 'admin', 'projects', 'docs', 'share', 'blueprint',
@@ -157,6 +159,118 @@ export default async function SpacePathPage({
             initialFolderId={docFolderId ?? undefined}
             folderOptions={folderOptions}
           />
+        </Container>
+      </Box>
+    );
+  }
+
+  // ── Ticket detail: /{company}/{...folder}/issues/{number} ───────────────────
+  if (path.length >= 3 && path[path.length - 2] === 'issues') {
+    const ticketRef  = path[path.length - 1];
+    const folderPath = path.slice(0, -2);
+
+    const folderResolved = await resolveSpacePath(companySlug, folderPath);
+    if (!folderResolved || folderResolved.kind !== 'folder') notFound();
+
+    const adminClient = await createAdminClient();
+
+    if (!isAdmin) {
+      const { data: membership } = await adminClient
+        .from('company_members').select('id')
+        .eq('company_id', folderResolved.companyId).eq('user_id', user.id).single();
+      if (!membership) notFound();
+    }
+
+    // Lookup by ticket_number (preferred) or UUID
+    const ticketNumber = parseInt(ticketRef, 10);
+    const query = adminClient
+      .from('documents')
+      .select('id, folder_id, title, description, created_at, metadata')
+      .eq('folder_id', folderResolved.folderId)
+      .eq('doc_type', 'ticket');
+
+    const { data: ticketDoc } = await (
+      !isNaN(ticketNumber)
+        ? query.filter('metadata->>ticket_number', 'eq', String(ticketNumber))
+        : query.eq('id', ticketRef)
+    ).single();
+
+    if (!ticketDoc) notFound();
+
+    // Fetch comments (stored in `comments` table with document_id = ticket id)
+    const { data: rawComments } = await adminClient
+      .from('comments')
+      .select('id, document_id, user_id, author_name, content, created_at')
+      .eq('document_id', ticketDoc.id)
+      .order('created_at', { ascending: true });
+
+    // Resolve creator email
+    let creatorEmail = '';
+    const m = (ticketDoc.metadata ?? {}) as Record<string, unknown>;
+    if (m.created_by) {
+      try {
+        const { data: creator } = await adminClient.auth.admin.getUserById(m.created_by as string);
+        creatorEmail = creator.user?.email ?? '';
+      } catch { /* best-effort */ }
+    }
+
+    const ticket: TicketDetail = {
+      id:               ticketDoc.id,
+      title:            ticketDoc.title,
+      description:      ticketDoc.description ?? null,
+      created_at:       ticketDoc.created_at,
+      status:           (m.status as string)           ?? 'new',
+      type:             (m.type   as string | null)     ?? null,
+      priority:         (m.priority as string)          ?? 'medium',
+      severity:         (m.severity as string)          ?? 'moderate',
+      module:           (m.module  as string | null)    ?? null,
+      url:              (m.url     as string | null)    ?? null,
+      screenshot_path:  (m.screenshot_path as string | null) ?? null,
+      created_by:       (m.created_by as string | null) ?? null,
+      created_by_email: creatorEmail,
+      ticket_number:    typeof m.ticket_number === 'number' ? m.ticket_number : null,
+    };
+
+    const comments: TicketComment[] = (rawComments ?? []).map((c) => ({
+      id:          c.id,
+      ticket_id:   c.document_id,
+      user_id:     c.user_id,
+      author_name: c.author_name,
+      content:     c.content,
+      created_at:  c.created_at,
+    }));
+
+    const currentUser = {
+      id:    user.id,
+      email: user.email ?? '',
+      name:  getDisplayName({ email: user.email, metadata: user.user_metadata ?? null }),
+    };
+
+    const canonicalBase = `/${companySlug}/${folderPath.join('/')}`;
+    const canonicalUrl  = `${canonicalBase}/issues/${ticketRef}`;
+
+    return (
+      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+        <Navbar isAdmin={isAdmin} userId={user.id} />
+        <Container maxWidth="lg" sx={{ py: 4 }}>
+          <SpaceBreadcrumbs
+            items={[
+              ...folderResolved.breadcrumbs.slice(0, -1),
+              { label: folderResolved.folderName, href: canonicalBase },
+              { label: 'Issues', href: `${canonicalBase}?tab=issues` },
+            ]}
+            current={ticket.ticket_number ? `#${String(ticket.ticket_number).padStart(3, '0')}` : ticket.title}
+          />
+          <Box sx={{ mt: 2 }}>
+            <TicketDetailClient
+              ticket={ticket}
+              initialComments={comments}
+              currentUser={currentUser}
+              isAdmin={isAdmin}
+              backHref={`${canonicalBase}?tab=issues`}
+              canonicalUrl={canonicalUrl}
+            />
+          </Box>
         </Container>
       </Box>
     );
