@@ -174,6 +174,7 @@ export function AdminTicketsClient() {
   const [statusF,    setStatusF]    = useState('');
   const [priorityF,  setPriorityF]  = useState('');
   const [typeF,      setTypeF]      = useState('');
+  const [search,     setSearch]     = useState('');
 
   // Drawer
   const [drawerId,   setDrawerId]   = useState<string | null>(null);
@@ -237,8 +238,19 @@ export function AdminTicketsClient() {
     if (statusF   && t.status   !== statusF)   return false;
     if (priorityF && t.priority !== priorityF) return false;
     if (typeF     && t.type     !== typeF)     return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const num = ticketNum(t.ticket_number)?.toLowerCase() ?? '';
+      if (
+        !t.title.toLowerCase().includes(q) &&
+        !num.includes(q) &&
+        !(t.company_name ?? '').toLowerCase().includes(q) &&
+        !(t.project_name ?? '').toLowerCase().includes(q) &&
+        !(t.created_by_email ?? '').toLowerCase().includes(q)
+      ) return false;
+    }
     return true;
-  }), [tickets, companyTab, statusF, priorityF, typeF]);
+  }), [tickets, companyTab, statusF, priorityF, typeF, search]);
 
   const stats = useMemo(() => {
     const c: Record<string, number> = {};
@@ -399,6 +411,18 @@ export function AdminTicketsClient() {
             onClick={() => setStatusF('')}>Clear</Button>
         )}
       </Stack>
+
+      {/* Search bar */}
+      <Box mb={2}>
+        <TextField
+          size="small"
+          fullWidth
+          placeholder="Search by title, #number, company, project or email…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          slotProps={{ input: { sx: { fontSize: 13 } } }}
+        />
+      </Box>
 
       {/* Compact filters: company · priority · type */}
       <Stack direction="row" alignItems="center" justifyContent="space-between"
